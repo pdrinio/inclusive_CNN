@@ -1,0 +1,41 @@
+<%@page language="java" import="com.infoengine.au.NamingService,wt.util.*"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string tipo  		Tipo de los contenedores que queremos devolver. Hay que pasar sólo el id lógico, sin el prefijo
+@param string filtro 		Filtro que se aplicará en la obtención de los containers
+-->
+
+	<ie:webject name="Create-Group" type="GRP">
+		<ie:param name="GROUP_OUT"  data="result"/>
+		<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+	</ie:webject>
+
+ <!-- Recuperamos los contenedores del tipo y según el filtro especificado	-->
+	<ie:webject name="Query-Objects" type="OBJ"> 
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="TYPE"            data="${@FORM[]tipo[]}"   default="WCTYPE|wt.inf.container.WTContainer"/>
+		<ie:param name="WHERE"           data="${@FORM[]filtro[]}" default="()"/>
+		<ie:param name="ATTRIBUTE"       data="name,containerInfo.defaultCabinetRef,class" delim=","/>
+		<ie:param name="GROUP_OUT"       data="containers"/>
+	</ie:webject>
+ 
+
+	<ie:webject name="Copy-Group" type="GRP">			
+		<ie:param name="GROUP_IN"   data="containers"/>      				
+		<ie:param name="GROUP_OUT"	data="result"/>
+	</ie:webject>
+
+<!-- Devolvemos el resultado    -->  
+	<ie:webject name="Sort-Group" type="GRP"> 
+		<ie:param name="GROUP_IN"     data="result"/>
+		<ie:param name="SORTBY"       data="class,name" delim=","/>
+		<ie:param name="GROUP_OUT"    data="output"/>
+	</ie:webject>

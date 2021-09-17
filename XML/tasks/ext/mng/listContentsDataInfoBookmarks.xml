@@ -1,0 +1,598 @@
+<%@page language="java" import="com.infoengine.au.NamingService,wt.util.*,java.util.regex.*,java.util.*,java.util.regex.Pattern"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+  String OBID_LINK = "obid.link";
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string container id del contenedor del que se van devolver sus objetos
+@param string likeLink indicara si los objetos de tipo WfFolderedBookmark se devolveran como un enlace o se devolvera el objeto destino del enlace. Toma valores true o false
+@param string where indica un filtro a aplicar a los resultados
+-->
+
+<ie:unit>
+
+<ie:webject name="List-FolderContents" type="OBJ">
+	<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+	<ie:param name="INSTANCE"        	data="<%= wtInstance %>" default="Windchill"/>
+	<ie:param name="AUTHORIZATION"   	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+	<ie:param name="OBJECT_REF" 	   	data="${@FORM[]container[0]}" />
+	<ie:param name="GROUP_OUT"			data="rC" />
+</ie:webject>
+
+
+<!-- PROCEDEMOS A QUEDARNOS CON LA ULTIMA ITERACION DE LA ULTIMA REVISION DE CADA DOCUMENTO -->
+<!-- Creamos sel grupo que contendra  el contenido del directorio filtrado -->
+<ie:webject name="Create-Group" type="GRP">
+	<ie:param name="GROUP_OUT" 	data="contents"/>
+	<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+</ie:webject>
+<ie:webject name="Create-Group" type="GRP">
+	<ie:param name="GROUP_OUT" 	data="rCF"/>
+	<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+</ie:webject>
+<ie:webject name="Create-Group" type="GRP">
+	<ie:param name="GROUP_OUT" 	data="rCNF"/>
+	<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+</ie:webject>
+<%
+	Group base = getGroup("rC");
+	Group tmpN = getGroup("rCF");
+	Group tmpS = getGroup("rCNF");
+	
+	for (int i = 0; i < base.getElementCount(); i++) {
+		if (base.getElementAt(i).getValue("masterReference") != null) {
+			tmpS.addElement(base.getElementAt(i));
+		} else {
+			tmpN.addElement(base.getElementAt(i));
+		}
+	}
+%>
+<ie:webject name="Sort-Group" type="GRP">
+    <ie:param name="GROUP_IN"   data="rCNF"/>
+    <ie:param name="SORTBY"	    data="masterReference,versionInfo.identifier.versionId,iterationInfo.identifier.iterationId" delim=","/>
+	<ie:param name="SORTED"		data="ASC,DESC,DESC" delim=","/>
+	<ie:param name="COMPARISON" data="ALPHA,NUMERIC,NUMERIC" delim=","/>
+    <ie:param name="GROUP_OUT"  data="rCNF"/>
+</ie:webject>
+<%
+			Group contents = getGroup("contents");
+			Group rC = getGroup("rCNF");
+			Hashtable<String, String> h = new Hashtable<String, String>();
+			String mRef = "";
+			
+			for (int i = 0; i < rC.getElementCount(); i++) {
+				mRef = (String)rC.getElementAt(i).getValue("masterReference");
+				mRef = mRef.split(":")[0] + ":" + mRef.split(":")[1] + ":" + mRef.split(":")[2];
+				if (!h.containsKey(mRef)) {
+					h.put(mRef, "1"); 
+					contents.addElement(rC.getElementAt(i));
+				}
+			}
+%>
+<ie:webject name="Concat-Groups" type="GRP">
+	  <ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+	  <ie:param name="GROUP_IN" 	data="rCF"/>
+	  <ie:param name="GROUP_IN" 	data="contents"/>
+	  <ie:param name="GROUP_OUT"	data="contents"/>
+</ie:webject>
+
+<!-- Creamos sel grupo que contendra los resultados -->
+<ie:webject name="Create-Group" type="GRP">
+	<ie:param name="GROUP_OUT" 	data="results"/>
+	<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+</ie:webject>
+
+<!-- Dividimos el grupo obtenido en cuatro subgrupos: directorios, parts, documentos y documentos CAD -->
+<!-- Subgrupo que contendra los directorios -->
+<ie:webject name="Subset-Group" type="GRP">
+    <ie:param name="FILTER_TYPE"	data="IE"/>
+    <ie:param name="FILTER_MODE"	data="MATCH"/>
+    <ie:param name="GROUP_IN" 		data="contents"/>
+    <ie:param name="FILTER" 		data="class='*wt.folder.*'"/>
+    <ie:param name="GROUP_OUT"		data="folders"/>
+</ie:webject>
+
+<ie:forEach groupIn="folders" groupOut="folder">
+	<ie:webject name="Query-Objects" type="OBJ"> 
+		<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="OBJECT_REF"		 data="${folder[]obid[]}"/>
+		<ie:param name="GROUP_OUT"       data="cItems"/>
+	</ie:webject>
+	
+	<ie:webject name="Expand-References" type="OBJ">
+	  <ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+      <ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+      <ie:param name="REFERENCE" 	data="obid"/>
+      <ie:param name="AUTHORIZATION" data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+      <ie:param name="GROUP_IN" 	data="cItems"/>
+      <ie:param name="GROUP_OUT" 	data="cItems"/>
+	</ie:webject>
+	
+	<ie:webject name="Concat-Groups" type="GRP">
+	  <ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+	  <ie:param name="GROUP_IN" 	data="cItems"/>
+	  <ie:param name="GROUP_IN" 	data="results"/>
+	  <ie:param name="GROUP_OUT"	data="results"/>
+	</ie:webject>
+</ie:forEach>
+
+<!-- Subgrupo de las Parts -->
+<ie:webject name="Subset-Group" type="GRP">
+    <ie:param name="FILTER_TYPE"	data="IE"/>
+    <ie:param name="FILTER_MODE" 	data="MATCH"/>
+    <ie:param name="GROUP_IN"		data="contents"/>
+    <ie:param name="FILTER"			data="class='*wt.part.WTPart*'"/>
+    <ie:param name="GROUP_OUT"		data="parts"/>
+</ie:webject>
+
+<ie:forEach groupIn="parts" groupOut="part">
+	<ie:webject name="Query-Objects" type="OBJ"> 
+		<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="OBJECT_REF"		 data="${part[]obid[]}"/>
+		<ie:param name="GROUP_OUT"       data="cItems"/>
+	</ie:webject>
+	
+	<ie:webject name="Expand-References" type="OBJ">
+		<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="REFERENCE" 		data="obid"/>
+		<ie:param name="AUTHORIZATION" 	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="GROUP_IN" 		data="cItems"/>
+		<ie:param name="GROUP_OUT" 		data="cItems"/>
+	</ie:webject>
+	
+	<ie:webject name="Concat-Groups" type="GRP">
+	  <ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+	  <ie:param name="GROUP_IN" 	data="cItems"/>
+	  <ie:param name="GROUP_IN" 	data="results"/>
+	  <ie:param name="GROUP_OUT" 	data="results"/>
+	</ie:webject>
+</ie:forEach>
+
+
+<!-- Subgrupo que contendra los EPMDocuments -->
+<ie:webject name="Subset-Group" type="GRP">
+    <ie:param name="FILTER_TYPE" 	data="IE"/>
+    <ie:param name="FILTER_MODE" 	data="MATCH"/>
+    <ie:param name="GROUP_IN" 		data="contents"/>
+    <ie:param name="FILTER" 		data="class='*wt.epm.EPMDocument*'"/>
+    <ie:param name="GROUP_OUT" 		data="epmdocuments"/>
+</ie:webject>
+
+<ie:forEach groupIn="epmdocuments" groupOut="epmdoc">
+	<ie:webject name="Query-Objects" type="OBJ"> 
+		<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="OBJECT_REF"		 data="${epmdoc[]obid[]}"/>
+		<ie:param name="GROUP_OUT"       data="cItems"/>
+	</ie:webject>
+	
+	<ie:webject name="Expand-References" type="OBJ">
+		<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="REFERENCE" 		data="format"/>
+		<ie:param name="AUTHORIZATION" 	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="GROUP_IN" 		data="cItems"/>
+		<ie:param name="GROUP_OUT" 		data="cItems"/>
+	</ie:webject>
+	
+	<ie:webject name="Expand-References" type="OBJ">
+		<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="REFERENCE" 		data="obid"/>
+		<ie:param name="AUTHORIZATION" 	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="GROUP_IN" 		data="cItems"/>
+		<ie:param name="GROUP_OUT" 		data="cItems"/>
+	</ie:webject>
+		
+	<%
+		try {
+	%>
+	<ie:webject name="List-ContentItems" type="OBJ">
+		<ie:param name="INSTANCE"        	data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="ACCEPT_LANGUAGE"	data="es-ES"/>
+		<ie:param name="AUTHORIZATION"  	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="OBJECT_REF" 		data="${epmdoc[]obid[]}"/>
+		<ie:param name="GROUP_OUT" 	   		data="LCI" />
+	</ie:webject>
+	
+	<ie:webject name="Join-Groups" type="GRP">
+		<ie:param name="GROUP_IN" 	data="cItems"/>
+		<ie:param name="GROUP_IN" 	data="LCI"/>
+		<ie:param name="JOINBY" 	data="obid,wt.content.HolderToContent.theContentHolder" delim=","/>
+		<ie:param name="GROUP_OUT"	data="cItems"/>
+	</ie:webject>
+	<%
+		} catch (Exception ex) {
+		}
+	%>		
+	
+	<ie:webject name="Concat-Groups" type="GRP">
+		<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+		<ie:param name="GROUP_IN" 	data="cItems"/>
+		<ie:param name="GROUP_IN" 	data="results"/>
+		<ie:param name="GROUP_OUT" 	data="results"/>
+	</ie:webject>
+</ie:forEach>
+
+
+<!-- Subgrupo que contendrá los WTDocuments -->
+<ie:webject name="Subset-Group" type="GRP">
+    <ie:param name="FILTER_TYPE" 	data="IE"/>
+    <ie:param name="FILTER_MODE" 	data="MATCH"/>
+    <ie:param name="GROUP_IN" 		data="contents"/>
+    <ie:param name="FILTER" 		data="class='*wt.doc.WTDocument*'"/>
+    <ie:param name="GROUP_OUT" 		data="documents"/>
+</ie:webject>
+
+<ie:forEach groupIn="documents" groupOut="doc">
+	<ie:webject name="Query-Objects" type="OBJ"> 
+		<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="OBJECT_REF"		 data="${doc[]obid[]}"/>
+		<ie:param name="GROUP_OUT"       data="cItems"/>
+	</ie:webject>
+	
+	<ie:webject name="Expand-References" type="OBJ">
+      <ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+	  <ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+      <ie:param name="REFERENCE" 		data="format"/>
+      <ie:param name="AUTHORIZATION" 	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+      <ie:param name="GROUP_IN" 		data="cItems"/>
+      <ie:param name="GROUP_OUT" 		data="cItems"/>
+	</ie:webject>
+	
+	<ie:webject name="Expand-References" type="OBJ">
+      <ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+	  <ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+      <ie:param name="REFERENCE" 		data="obid"/>
+      <ie:param name="AUTHORIZATION" 	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+      <ie:param name="GROUP_IN" 		data="cItems"/>
+      <ie:param name="GROUP_OUT" 		data="cItems"/>
+	</ie:webject>	
+	
+	<%
+		try {
+	%>
+	<ie:webject name="List-ContentItems" type="OBJ">
+	  <ie:param name="INSTANCE"        	data="<%= wtInstance %>" default="Windchill"/>
+	  <ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+      <ie:param name="AUTHORIZATION"   	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+	  <ie:param name="OBJECT_REF" 		data="${doc[]obid[]}"/>
+	  <ie:param name="GROUP_OUT" 	   	data="LCI" />
+	</ie:webject>
+	
+	<ie:webject name="Join-Groups" type="GRP">
+		<ie:param name="GROUP_IN" 	data="cItems"/>
+		<ie:param name="GROUP_IN" 	data="LCI"/>
+		<ie:param name="JOINBY" 	data="obid,wt.content.HolderToContent.theContentHolder" delim=","/>
+		<ie:param name="GROUP_OUT" 	data="cItems"/>
+	</ie:webject>
+	<%
+		} catch (Exception ex) {
+		}
+	%>
+		
+	<ie:webject name="Concat-Groups" type="GRP">
+	  <ie:param name="CLASS" data="wt.fc.WTObject"/>
+	  <ie:param name="GROUP_IN" 	data="cItems"/>
+	  <ie:param name="GROUP_IN" 	data="results"/>
+	  <ie:param name="GROUP_OUT" 	data="results"/>
+	</ie:webject>
+</ie:forEach>
+
+<ie:webject name="Subset-Group" type="GRP">
+    <ie:param name="FILTER_TYPE" 	data="IE"/>
+    <ie:param name="FILTER_MODE" 	data="MATCH"/>
+    <ie:param name="GROUP_IN" 		data="contents"/>
+    <ie:param name="FILTER" 		data="class='*wt.workflow.notebook.WfFolderedBookmark*'"/>
+    <ie:param name="GROUP_OUT" 		data="bookmarks"/>
+</ie:webject>
+
+<ie:forEach groupIn="bookmarks" groupOut="bookmark">
+	<%
+		Group link = getGroup("bookmark");
+		
+		//Obtenemos el id del objeto destino del enlace
+		//String obid = (String)link.getAttributeValue(0,"objectReference");
+		String obid = null;
+		String url = (String)link.getAttributeValue(0,"url");
+		url = url.replace("%3A" , ":").replace("%3a" , ":");
+		Pattern pattern = Pattern.compile(".+oid=(.+:.+:\\d+)(&u8=1)?");
+		Matcher matcher = pattern.matcher(url);
+		boolean matchFound = matcher.find();
+		if (matchFound) {
+			obid = matcher.group(1);
+		} else {
+			obid = (String)link.getAttributeValue(0,"objectReference");
+		}
+	
+		String obidLink = (String)link.getAttributeValue(0,"obid");		
+				
+		link.setAttributeValue(0,"obid", obid);				//Sustituimos el obid del enlace por el obid del objeto destino		
+	%>
+	
+	<%
+		try {
+	%>
+	<ie:webject name="Query-Objects" type="OBJ"> 
+		<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="OBJECT_REF"		 data="<%= obid %>"/>
+		<ie:param name="GROUP_OUT"       data="cItems"/>
+	</ie:webject>
+	
+	<ie:webject name="Expand-References" type="OBJ">
+		<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+        <ie:param name="REFERENCE" 		data="obid"/>
+        <ie:param name="AUTHORIZATION" 	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+        <ie:param name="GROUP_IN" 		data="cItems"/>
+        <ie:param name="GROUP_OUT" 		data="cItems"/>
+	</ie:webject>
+	
+	<!-- Si se trata de un documento expandimos por formato y buscamos informacion del contenido -->
+	<%
+		if (obid.toLowerCase().contains("document")) {
+	%>
+			<ie:webject name="Expand-References" type="OBJ">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+				<ie:param name="REFERENCE" 		data="format"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+				<ie:param name="GROUP_IN" 		data="cItems"/>
+				<ie:param name="GROUP_OUT" 		data="cItems"/>
+			</ie:webject>
+			<%
+				try {
+			%>
+				<ie:webject name="List-ContentItems" type="OBJ">
+					<ie:param name="INSTANCE"        	data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+					<ie:param name="AUTHORIZATION"   	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+					<ie:param name="OBJECT_REF" 		data="${bookmark[]obid[]}"/>
+					<ie:param name="GROUP_OUT" 	   		data="LCI" />
+				</ie:webject>
+				
+				<ie:webject name="Join-Groups" type="GRP">
+					<ie:param name="GROUP_IN" 	data="cItems"/>
+					<ie:param name="GROUP_IN" 	data="LCI"/>
+					<ie:param name="JOINBY" 	data="obid,wt.content.HolderToContent.theContentHolder" delim=","/>
+					<ie:param name="GROUP_OUT" 	data="cItems"/>
+				</ie:webject>
+			<%
+				} catch (Exception ex) {
+				}
+			%>
+	<%
+		}
+		boolean likeLink = true;
+				
+		likeLink = Boolean.parseBoolean(((String)getParam("likeLink" , "true")).toLowerCase());		
+		getGroup("cItems").setAttributeValue(0, OBID_LINK, obidLink);			//Guardamos el obid del enlace en el atributo "obid.link"
+		
+		if (likeLink) {
+			String clase = (String)getGroup("bookmark").getAttributeValue(0,"class");
+			getGroup("cItems").setAttributeValue(0,"class", clase);
+		}
+	%>
+	
+	<ie:webject name="Concat-Groups" type="GRP">
+	  <ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+	  <ie:param name="GROUP_IN" 	data="cItems"/>
+	  <ie:param name="GROUP_IN" 	data="results"/>
+	  <ie:param name="GROUP_OUT" 	data="results"/>
+	</ie:webject>
+	<%
+		} catch (Exception ex) {	
+		}
+	%>
+</ie:forEach>
+
+<%
+	String MIN_DATE = "01/01/1900 00:00:00";
+	String MIN_DATE_EN = "1900-01-01 00:00:00";
+%>
+
+<!-- Para cada elemento del grupo de resultados, obtendremos sus atributos -->
+<ie:forEach groupIn="results" groupOut="elemento">
+	<!-- Obtenemos los atributos para el tipo del elemento en cuestion -->
+	<ie:webject name="Describe-Attributes" type="OBJ">
+		<ie:param name="INSTANCE"        			data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="ACCEPT_LANGUAGE" 			data="es-ES"/>
+		<ie:param name="AUTHORIZATION"   			data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="GROUP_OUT" 					data="attributes"/>
+		<ie:param name="TYPE"						data="${elemento[]obid.class[]}"/>
+		<ie:param name="INCLUDE_CONSTRAINTS" 		data="TRUE"/>
+		<ie:param name="INCLUDE_DESCRIPTORS" 		data="TRUE"/>
+		<ie:param name="INCLUDE_SOFT_ATTRIBUTES" 	data="TRUE"/>
+		<ie:param name="ATTRIBUTE"					data="name,displayName" delim=","/>
+	</ie:webject>
+	
+	<ie:webject name="Subset-Group" type="GRP">
+		<ie:param name="FILTER_TYPE" 	data="IE"/>
+		<ie:param name="FILTER_MODE" 	data="NOMATCH"/>
+		<ie:param name="GROUP_IN" 		data="attributes"/>
+		<ie:param name="FILTER" 		data="name='name'"/>
+		<ie:param name="GROUP_OUT" 		data="attributes"/>
+	</ie:webject>
+	
+	<ie:webject name="Sort-Group" type="GRP">
+		<ie:param name="GROUP_IN"   data="attributes"/>
+		<ie:param name="SORTBY"	    data="displayName" delim=","/>
+		<ie:param name="SORTED" 	data="ASC"/>
+		<ie:param name="COMPARISON" data="ALPHA"/>
+		<ie:param name="GROUP_OUT"  data="attributes"/>
+	</ie:webject>
+	
+	<!-- Creamos el grupo que contendrá los atributos del objeto -->
+	<ie:webject name="Create-Group" type="GRP">
+		<ie:param name="GROUP_OUT" 	data="atributosObjeto"/>
+		<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+	</ie:webject>
+	<%
+		Group gAtt = getGroup("atributosObjeto");
+		Group elemento = getGroup("elemento");
+		Group refObj = null;
+		String dName = null;
+		String type = null;
+		Vector vectorValores;
+		List<Element> listValores;
+		String values;
+		String BASEUSER = "0=Usuario desconocido";
+		String user = null;
+		
+		// Comprobación para los documentos con usuario borrado
+		user = (String)getGroup("elemento").getAttributeValue(0, "iterationInfo.modifier");
+		
+		if ((user != null) && !(user.contains("="))) {
+			getGroup("elemento").setAttributeValue(0,"iterationInfo.modifier",BASEUSER);
+		}
+	%>
+	
+	<ie:forEach groupIn="attributes" groupOut="atributo">
+		<%
+			Group atributo = getGroup("atributo");
+			String fecha;
+			values = "";
+
+//	Esta comprobación se quita para permitir asignar valores a atributos creados después de la creación del objeto.
+//			if (elemento.getAttributeValue(0 , "obid." + atributo.getAttributeValue(0, "name")) != null) {
+				//El atributo esta presente, por tanto crearemos el elemento de salida
+				Element att = new Element("atributo");
+				
+				att.addAtt(new Att("name" , atributo.getAttributeValue(0, "name")));
+				
+				type = ((String)atributo.getAttributeValue(0, "type"));
+				type = type.substring(type.lastIndexOf(".")+1);
+				att.addAtt(new Att("type" , type));
+				
+				dName = (String)atributo.getAttributeValue(0, "displayName");
+				if (!dName.contains(":")) {
+					att.addAtt(new Att("displayName" , dName));
+					att.addAtt(new Att("orden" , "1000"));
+				} else {
+					att.addAtt(new Att("displayName" , dName.substring(dName.lastIndexOf(":")+1)));
+					att.addAtt(new Att("orden" , dName.substring(0,dName.lastIndexOf(":"))));
+				}
+				
+				if (!type.contains("FloatingPoint")) {
+					att.addAtt(new Att("defaultValue" , atributo.getAttributeValue(0, "defaultValue")));
+				} else {
+					att.addAtt(new Att("defaultValue" , "0"));
+				}
+				
+				if (!type.endsWith("Timestamp")) {
+					att.addAtt(new Att ("value", elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name"))));
+					
+					if ((!dName.startsWith("0:")) &&(elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name")) != null) && (Pattern.matches("(VR|vr|OR|or):.+WTUser:\\d+", (String)elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name"))))) {
+%>
+						<ie:webject name="Query-Objects" type="OBJ"> 
+							<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+							<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+							<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+							<ie:param name="OBJECT_REF"		 data="<%= elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name"))  %>"/>
+							<ie:param name="ATTRIBUTE"		 data="obid,name,fullName" delim=","/>
+							<ie:param name="GROUP_OUT"       data="referencedObject"/>
+						</ie:webject>
+<%
+						refObj = getGroup("referencedObject");
+						
+						if ((refObj != null) && (refObj.getAttributeValue(0, "fullName") != null)) {
+							att.addAtt(new Att ("displayValue", refObj.getAttributeValue(0, "fullName")));
+						}
+					}
+					else if ((!dName.startsWith("0:")) &&(elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name")) != null) && (Pattern.matches("(VR|vr|OR|or):.+:\\d+", (String)elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name"))))) {
+%>
+						<ie:webject name="Query-Objects" type="OBJ"> 
+							<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+							<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+							<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+							<ie:param name="OBJECT_REF"		 data="<%= elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name"))  %>"/>
+							<ie:param name="ATTRIBUTE"		 data="obid,name" delim=","/>
+							<ie:param name="GROUP_OUT"       data="referencedObject"/>
+						</ie:webject>
+<%
+						refObj = getGroup("referencedObject");
+						
+						if ((refObj != null) && (refObj.getAttributeValue(0, "name") != null)) {
+							att.addAtt(new Att ("displayValue", refObj.getAttributeValue(0, "name")));
+						}
+					}
+				} else {
+					fecha = (String)elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name"));
+					if ((fecha.contains(MIN_DATE)) | (fecha.contains(MIN_DATE_EN))) {
+						att.addAtt(new Att ("value", ""));
+					} else {
+						att.addAtt(new Att ("value", fecha));
+					}
+				}
+
+				listValores = atributo.getElementList();				
+				for (Element atr : listValores) {
+					vectorValores = atr.getValues("value");
+					if (!vectorValores.isEmpty()) {
+						values = vectorValores.toString();
+					}				
+				}				
+				att.addAtt(new Att("listValues", values));
+				
+				gAtt.addElement(att);
+//			}
+		%>
+	</ie:forEach>
+	
+	<%
+		if (gAtt.getElementCount() > 0) {
+			elemento.setAttributeValue(0 , "atributosObjeto" , gAtt);
+		}
+	%>
+</ie:forEach>
+
+<%
+	String filter = null;
+	String filterMode = null;
+	String filterType = null;
+	
+	filter = (String)getParam("where" , "class='*'");
+	
+	if (filter.contains("<>")) {
+		//Se trata de una comparacion de desigualdad
+		filter = filter.replace("<>" , "=");
+		filterMode = "NOMATCH";
+	} else {
+		//Se trata de una comparacion de igualdad
+		filterMode = "MATCH";
+	}
+	
+	if (filter.contains("&") | filter.contains("|")) {
+		filterType = "REGEXP";
+	} else {
+		filterType = "IE";
+	}
+%>
+<ie:webject name="Subset-Group" type="GRP">
+    <ie:param name="FILTER_TYPE" 	data="<%= filterType %>"/>
+    <ie:param name="FILTER_MODE" 	data="<%= filterMode %>"/>
+	<ie:param name="FILTER" 		data="<%= filter %>"/>
+    <ie:param name="GROUP_IN" 		data="results"/>
+    <ie:param name="GROUP_OUT" 		data="results"/>
+</ie:webject>
+
+<ie:webject name="Sort-Group" type="GRP">
+    <ie:param name="GROUP_IN"   data="results"/>
+    <ie:param name="SORTBY"	    data="name" delim=","/>
+    <ie:param name="GROUP_OUT"  data="output"/>
+</ie:webject>
+</ie:unit>

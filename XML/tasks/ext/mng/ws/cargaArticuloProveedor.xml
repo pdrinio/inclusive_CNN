@@ -1,0 +1,255 @@
+<%@page language="java" import="com.infoengine.au.NamingService"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="wt.util.*,java.io.*,java.util.*"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+  String serverPrefix = wtInstance.substring(0,wtInstance.lastIndexOf("."));
+  
+  serverPrefix = serverPrefix.substring(0,serverPrefix.lastIndexOf("."));
+%>
+
+<!--com.infoengine.delegate.def
+@comment Servicio Web para cargar los artículos de un proveedor desde un fichero.
+@delegateName cargaArticuloProveedor
+-->
+
+<!--com.infoengine.soap.rpc.def
+@param string borrar	1-> Borra las relaciones existentes; 0-> NO borra las relaciones existenes
+-->
+
+<%
+	String PATH_FILE = "C:\\ptc\\ARTPROVE.TXT";
+	String result = "result=false";
+	String paramBorrar = (String) getParam("borrar", "0");
+    String linea, idArticulo, idProv, idTerceroWC, precio, idLink;
+    BufferedReader buffer;
+	Boolean hecho, borrar;
+	int cont = 0;
+    HashMap<String, HashMap<String, String>> artsProv = new HashMap<String, HashMap<String, String>>();
+    HashMap<String, String> artsPrecio = new HashMap<String, String>();
+	Iterator it, it2;
+	Map.Entry e, e2;
+	Group grp;
+	Enumeration atributos = null;
+	Att atributo = null;
+	
+	borrar = paramBorrar.equals("1");
+	/************************ PROCESAMOS EL FICHERO ********************************/
+	try {
+		FileReader reader = new FileReader(PATH_FILE);
+		buffer = new BufferedReader(reader);
+
+		while ((linea = buffer.readLine()) != null) {
+			idArticulo = linea.split(",")[0];
+			idProv = linea.split(",")[1];
+
+			if (linea.split(",").length > 2) {
+				precio = linea.split(",")[2];
+			} else {
+				precio = "0";
+			}
+
+			if (artsProv.containsKey(idProv)) {
+				artsPrecio = artsProv.get(idProv);
+				artsPrecio.put(idArticulo, precio);
+			} else {
+				artsPrecio = new HashMap();
+				artsPrecio.put(idArticulo, precio);
+				artsProv.put(idProv, artsPrecio);
+			}
+		}	
+	} catch (Exception ex){
+		artsProv.clear();
+		System.out.println("****************************************************************");
+		System.out.println("****************************************************************");
+		System.out.println("****************************************************************");
+		System.out.println("CARGA ARTICULOS PROVEEDOR.");
+		System.out.println("ERROR en la lectura del fichero: " + ex.toString());
+		System.out.println("****************************************************************");
+		System.out.println("****************************************************************");
+		System.out.println("****************************************************************");
+	}
+%>	
+	<ie:unit>
+  		<ie:init>
+			<ie:webject name="Start-Session" type="ACT">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[]}"/>
+				<ie:param name="GROUP_OUT" 		data="session"/>				
+			</ie:webject>
+
+			<ie:webject name="Start-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" 	data="${session[]session_id[0]}"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[]}"/>
+			</ie:webject>
+		</ie:init>
+<%	
+	it = artsProv.entrySet().iterator();	
+	while (it.hasNext()) {
+		e = (Map.Entry)it.next();
+		idProv = e.getKey().toString();
+		cont = cont + 1;
+		
+		System.out.println("****************************************************************");
+		System.out.println("Procesando proveedor: " + idProv);
+		System.out.println("Registro " + cont + " de " + artsProv.size());
+		System.out.println("****************************************************************");
+%>	
+		<ie:webject name="Search-Objects" type="OBJ"> 
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="INSTANCE"       data="<%= wtInstance %>"/>
+			<ie:param name="AUTHORIZATION"  data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+			<ie:param name="TYPE"			data="Tercero"/>
+			<ie:param name="WHERE"			data="(Id='<%= idProv %>')"/>
+			<ie:param name="ATTRIBUTE"		data="obid"/>
+			<ie:param name="GROUP_OUT"      data="tercero"/>
+		</ie:webject>		
+	<%
+		grp = getGroup("tercero");
+		if (grp.getElementCount() > 0) {
+			idTerceroWC = grp.getAttributeValue(0, "obid").toString();
+	%>
+			<ie:webject name="Checkout-Objects" type="ACT">
+				<ie:param name="ACCEPT_LANGUAGE"	data="es-ES"/>
+				<ie:param name="INSTANCE" 			data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="OBJECT_REF" 		data="<%= idTerceroWC %>"/>
+				<ie:param name="GROUP_OUT" 			data="checkout"/>
+			</ie:webject>
+	<%			
+			if (borrar) {
+				System.out.println("****************************************************************");
+				System.out.println("Borrando relaciones existentes ...............");		
+				System.out.println("****************************************************************");
+	%>			
+				<ie:webject name="Query-Tree" type="OBJ">
+					<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+					<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="OBJECT_REF" 	data="${checkout[]obid[]}"/>
+					<ie:param name="DIRECTION" 		data="uses"/>
+					<ie:param name="TYPE" 			data="wt.part.WTPartUsageLink"/>	  
+					<ie:param name="DEPTH" 			data="1"/>
+					<ie:param name="OUTPUT_TYPE"	data="FULL"/>
+					<ie:param name="AUTO_NAVIGATE" 	data="TRUE"/>
+					<ie:param name="SELECTBY" 		data="LATEST"/>
+					<ie:param name="ATTRIBUTE" 		data="*"/>
+					<ie:param name="GROUP_OUT" 		data="arbol"/>
+				</ie:webject>			
+	<%
+				for (Element elemento:getGroup("arbol").getElementList()) {		
+					atributos = elemento.getAtts();				
+					hecho = false;
+					idLink = null;		
+					
+					while (atributos.hasMoreElements() & !hecho) {
+						atributo = (Att)atributos.nextElement();
+						if (atributo.getName().contains("WCTYPE|wt.part.WTPartUsageLink|" + serverPrefix + ".ArticuloProveedor.obid")) {
+							idLink = atributo.getValue().toString();						
+							hecho = true;
+						}
+					}
+					if (hecho) {
+	%>
+						<ie:webject name="Delete-Objects" type="ACT">
+							<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+							<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+							<ie:param name="OBJECT_REF"   	data="<%= idLink %>" />
+							<ie:param name="GROUP_OUT" 		data="borrado"/>
+						</ie:webject>
+	<%					
+					}
+				}
+			} /* IF borrar */
+			
+			System.out.println("****************************************************************");
+			System.out.println("Asociando articulos a proveedor ..............");
+			System.out.println("****************************************************************");
+
+			artsPrecio = (HashMap<String, String>) e.getValue();
+			it2 = artsPrecio.entrySet().iterator();
+			int cont2 = 0;
+			while (it2.hasNext()) {
+				e2 = (Map.Entry)it2.next();
+				idArticulo = e2.getKey().toString();
+				cont2 = cont2 + 1;
+	%>		
+				<ie:webject name="Query-Master" type="OBJ">
+					<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+					<ie:param name="INSTANCE"       data="<%= wtInstance %>"/>
+					<ie:param name="AUTHORIZATION"  data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+					<ie:param name="TYPE"			data="Articulo"/>
+					<ie:param name="WHERE"			data="(Id='<%= idArticulo %>')"/>			
+					<ie:param name="GROUP_OUT"      data="articulo"/>
+				</ie:webject>
+	<%
+				grp = getGroup("articulo");
+				if (grp.getElementCount() > 0) {
+					precio = e2.getValue().toString();
+	%>
+					<ie:webject name="Create-Object" type="ACT">
+						<ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+						<ie:param name="INSTANCE" 			data="<%= wtInstance %>" default="Windchill"/>
+						<ie:param name="TYPE" 				data="ArticuloProveedor"/>
+						<ie:param name="FIELD"  			data="usedBy=${checkout[0]obid[]}"/>
+						<ie:param name="FIELD"    			data="uses=${articulo[0]obid[]}"/>
+						<ie:param name="FIELD"	     		data="Precio=<%= precio.replace(".", ",") %>"/>
+						<ie:param name="GROUP_OUT" 	     	data="links"/>
+					</ie:webject>
+	<%
+				}
+				System.out.println("****************************************************************");
+				System.out.println("Asociado articulo " + cont2 + " de " + artsPrecio.size());
+				System.out.println("****************************************************************");
+			} /* WHILE Articulos Proveedor*/
+	%>
+			<ie:webject name="Checkin-Objects" type="ACT">
+				<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="OBJECT_REF" 	data="<%= idTerceroWC %>"/>
+				<ie:param name="GROUP_OUT" 		data="checkin"/>
+			</ie:webject>
+	<%			
+		} /* IF existe Tercero */
+	} /* WHILE */	
+	result = "result=true";
+	
+	System.out.println("****************************************************************");
+	System.out.println("****************************************************************");
+	System.out.println("CARGA ARTICULOS PROVEEDOR.");
+	System.out.println("Finalizado proceso de carga");		
+	System.out.println("****************************************************************");
+	System.out.println("****************************************************************");	
+	%>			
+		<ie:webject name="Create-Group" type="GRP">
+			<ie:param name="ELEMENT"	data="<%= result %>"/>
+			<ie:param name="GROUP_OUT"	data="output"/>
+		</ie:webject>
+			
+		<ie:success>
+			<ie:webject name="Commit-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="End-Session" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+		</ie:success>
+		
+		<ie:failure>
+    		<ie:webject name="Rollback-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="End-Session" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="Throw-Exception" TYPE="MGT"/>
+		</ie:failure>
+	</ie:unit>

@@ -1,0 +1,65 @@
+<?xml version="1.0" standalone="yes"?>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+
+Update de los atributos que se le pasa como parametros
+
+@param string ufid 					El id del objeto a actualizar
+@param string atributosEliminar 	Atributos para ser eliminados
+@param string atributosActualizar 	Atributos para ser actualizados
+@param string descripcion			Nueva descripción del objeto
+
+-->
+
+<%
+	String atrDelete = (String) getParam("atributosEliminar", "");
+	String ufid = (String) getParam("ufid" , "");
+	
+	if (atrDelete.length() > 0)
+	{
+%>
+  
+<ie:webject name="Update-Objects" type="ACT">
+  <ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+  <ie:param name="instance" data="<%= wtInstance %>" default="Windchill"/>
+  <ie:param name="AUTHORIZATION" data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+  <ie:param name="object_ref" data="${@FORM[]ufid[]}"/>
+  <ie:param name="FIELD" data="${@FORM[]atributosEliminar[]}" valueSeparator=";" delim=";" />
+  <%
+		if (!ufid.toLowerCase().contains("wtpart")) {
+  %>
+  <ie:param name="FIELD" data="description" />
+  <%
+		}
+  %>
+  <ie:param name="MODIFICATION" data="DELETE"/>
+  <ie:param name="group_out" data="output"/>
+</ie:webject>
+
+<%
+	}
+%>
+
+<ie:webject name="Update-Objects" type="ACT">
+  <ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+  <ie:param name="instance" data="<%= wtInstance %>" default="Windchill"/>
+  <ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+  <ie:param name="object_ref" data="${@FORM[]ufid[]}"/>
+  <ie:param name="FIELD" data="${@FORM[]atributosActualizar[]}" valueSeparator=";" delim=";" default=""/>
+  <%
+		if (!ufid.toLowerCase().contains("wtpart")) {
+  %>
+  <ie:param name="FIELD" data="description=${@FORM[]descripcion[]}" />
+  <%
+		}
+  %>
+  <ie:param name="MODIFICATION" data="REPLACE"/>
+  <ie:param name="group_out" data="output"/>
+</ie:webject>

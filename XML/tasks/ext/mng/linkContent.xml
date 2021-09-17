@@ -1,0 +1,79 @@
+<?xml version="1.0" standalone="yes"?>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="com.infoengine.object.factory.Att"%>
+<%@page import="com.infoengine.object.factory.Element"%>
+<%@page import="java.util.Enumeration"%>
+<%@page import="java.util.Vector"%>
+<%@page import="java.net.URL"%>
+<%@page import="wt.adapter.BasicWebjectDelegate"%>
+<%@page import="wt.content.*"%>
+<%@page import="wt.fc.PersistenceHelper"%>
+<%@page import="wt.fc.QueryResult"%>
+<%@page import="wt.fv.master.MasterHelper"%>
+<%@page import="wt.content.ContentHelper"%>
+<%@page import="wt.fv.uploadtocache.*"%>
+
+<!--com.infoengine.soap.rpc.def
+
+Asocia mediante el api un fichero a un objeto de Windchill
+
+@param string obid Id del objeto al que se le quiere asociar contenido
+@param string checksum
+@param string streamId                        
+@param string fileSize                        
+@param string folderId                       
+@param string contentIdentity    
+@param string filename                  
+-->
+<%
+try {
+
+	Group output = new Group ("output");
+	Element elem = new Element ();
+	
+	String ufid = (String) getParam ("obid");
+	long checksum = Long.parseLong((String)getParam("checksum"));
+	long streamId = Long.parseLong((String) getParam("streamId"));
+	long fileSize = Long.parseLong((String)getParam("fileSize"));
+	long folderId = Long.parseLong((String) getParam("folderId"));
+	String contentIdentity = (String) getParam("contentIdentity");
+	String filename = (String) getParam("filename");
+	
+	//Obtenemos el ContentHolder
+	ContentHolder contentHolder = null;
+	contentHolder = (ContentHolder)BasicWebjectDelegate.getObjectByUfid (ufid);
+	
+	//Creamos el ApplicationData para el ContentHolder
+	ApplicationData appData = ApplicationData.newApplicationData (contentHolder);
+	appData.setFileName(filename);
+	appData.setRole(wt.content.ContentRoleType.PRIMARY);
+	appData.setContentIdentity(contentIdentity);
+	
+	//Creamos el CachedContentDescriptor
+	CachedContentDescriptor ccDes = new CachedContentDescriptor();
+	ccDes.setChecksum(checksum);
+	ccDes.setStreamId(streamId);
+	ccDes.setFileSize(fileSize);
+	ccDes.setFolderId(folderId);
+	ccDes.setContentIdentity(contentIdentity);
+	
+	//ContentServerHelper.service.updateContent(contentHolder, appData, ccDes, false);
+	ContentServerHelper.service.updateContent(contentHolder, appData, ccDes);
+	
+	if( contentHolder instanceof FormatContentHolder) {
+		contentHolder = ContentServerHelper.service.updateHolderFormat((FormatContentHolder)contentHolder);
+	}
+	
+	//Generamos la salida
+	elem.addAtt (new Att ("result", "CREADO"));
+	output.addElement (elem);
+}
+catch ( Exception e ) {
+  throw new IEException (e);
+}
+
+%>
+
+<ie:webject name="Return-Groups" type="GRP">
+  <ie:param name="group_in" data="output"/>
+</ie:webject>

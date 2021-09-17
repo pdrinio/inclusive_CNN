@@ -1,0 +1,27 @@
+<?xml version="1.0" standalone="yes"?>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+
+Moves one or more specific objects to a specific folder. The objects are
+identified by UFID.  The objects may have a variety of types.  The moved
+objects are returned.
+
+@param string ufids             La lista de ids de objetos a mover separados por ";"
+@param string folderRef     El  id de la carpeta a la que se mueven los objetos
+
+-->
+
+<ie:webject name="Move-Objects" type="ACT">
+  <ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+  <ie:param name="instance"        data="<%= wtInstance %>" default="Windchill"/>
+  <ie:param name="object_ref"      data="${@FORM[]ufids[]}"   valueSeparator=";" delim=";"/>
+  <ie:param name="folder_ref"       data="${@FORM[]folderRef[]}"/>
+  <ie:param name="group_out"     data="output"/>
+</ie:webject>

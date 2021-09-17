@@ -1,0 +1,67 @@
+<%@page language="java" import="com.infoengine.au.NamingService"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+
+Borra los objetos cuyos oids se pasan por parámetro.
+La tarea devuelve los objetos borrados
+
+@param string oids   Ids de los objetos a borrar separados por ";"
+-->
+
+<ie:unit>
+
+  <ie:init>
+
+    <ie:webject name="Start-Session" type="ACT">
+      <ie:param name="INSTANCE"   data="<%= wtInstance %>" default="Windchill"/>
+      <ie:param name="BLOB_COUNT" data="0" />
+      <ie:param name="GROUP_OUT"  data="session"/>
+    </ie:webject>
+    
+    <ie:webject name="Start-Transaction" type="ACT">
+      <ie:param name="INSTANCE"   data="${session[0]INSTANCE[0]}"/>
+      <ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+    </ie:webject>
+  </ie:init>
+  	
+    <ie:webject name="Delete-Objects" type="ACT">
+	  <ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+      <ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+      <ie:param name="OBJECT_REF"   data="${@FORM[]oids[*]}" valueSeparator=";" delim=";"/>
+      <ie:param name="GROUP_OUT" 	data="output"/>
+    </ie:webject>
+
+ <ie:success>
+    <ie:webject name="Commit-Transaction" type="ACT">
+      <ie:param name="INSTANCE"   data="${session[0]INSTANCE[0]}"/>
+      <ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+    </ie:webject>
+    
+    <ie:webject name="End-Session"	type="ACT">
+      <ie:param name="INSTANCE"   data="${session[0]INSTANCE[0]}"/>
+      <ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+    </ie:webject>
+ </ie:success>
+
+ <ie:failure>
+    <ie:webject name="Rollback-Transaction" type="ACT">
+      <ie:param name="INSTANCE"   data="${session[0]INSTANCE[0]}"/>
+      <ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+    </ie:webject>
+    
+    <ie:webject name="End-Session"	type="ACT">
+      <ie:param name="INSTANCE"   data="${session[0]INSTANCE[0]}"/>
+      <ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+    </ie:webject>
+
+    <ie:webject name="Throw-Exception" type="MGT" />
+ </ie:failure>
+
+</ie:unit>

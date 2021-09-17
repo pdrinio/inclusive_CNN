@@ -1,0 +1,66 @@
+<%@page language="java" import="com.infoengine.au.NamingService"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="wt.util.*,java.util.*"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.delegate.def
+@comment Tarea que decodifica los caracteres HTML contenidos en la cadena que recibe como parametro
+@delegateName HtmlDecoder
+-->
+
+<!--com.infoengine.soap.rpc.def
+@param string cadena
+-->
+
+<%
+	String cadena = (String) getParam("cadena", "");
+	String number;
+	int i, tmpPos;
+    int maxPos = cadena.length();
+	int curPos = 0;
+    StringBuffer sb = new StringBuffer(maxPos);
+    
+	while (curPos < maxPos) {
+		char c = cadena.charAt(curPos++);
+		if (c == '&') {
+			tmpPos = curPos;
+			if (tmpPos < maxPos) {
+				char d = cadena.charAt(tmpPos++);
+				if (d == '#') {
+					if (tmpPos < maxPos) {
+						d = cadena.charAt(tmpPos++);
+						if (d >= '0' && d <= '9') {
+							while (tmpPos < maxPos) {
+								d = cadena.charAt(tmpPos++);							  
+								if (d == ';') {
+									number = cadena.substring(curPos + 2, tmpPos - 1);
+									try {
+										i = Integer.parseInt(number, 16);
+										if (i >= 0 && i < 65536) {
+											c = (char) i;
+											curPos = tmpPos;
+										}
+									} catch (NumberFormatException e) {
+									}
+									break;
+								}
+							} // while
+						}
+					}
+				}
+			}
+		}// if (c == '&')
+		sb.append(c);
+	}
+	
+	cadena = sb.toString();	
+	cadena = "result=" + cadena;
+%>
+	<ie:webject name="Create-Group" type="GRP">
+		<ie:param name="ELEMENT"	data="<%= cadena %>"/>
+		<ie:param name="GROUP_OUT"	data="stringDecode"/>
+	</ie:webject>

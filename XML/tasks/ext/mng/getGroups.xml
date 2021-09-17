@@ -1,0 +1,131 @@
+<?xml version="1.0" standalone="yes"?>
+<%@page language="java" session="false"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import= "java.util.*"
+	import= "wt.pdmlink.PDMLinkProduct"
+    import= "wt.session.SessionHelper"        	          
+	import= "wt.inf.template.*"
+	import= "wt.inf.container.*"
+	import= "wt.fc.*"
+	import= "wt.fc.collections.*"
+	import= "wt.org.*"
+	import= "wt.admin.*"
+	import= "wt.util.*"
+	import= "wt.type.*"
+	import= "wt.part.*"	
+	import= "wt.folder.*"
+	import= "wt.inf.library.*"	
+	import= "com.ptc.core.foundation.type.server.impl.TypeHelper"
+	import= "com.ptc.core.foundation.type.common.TypeIdentifierSelectionHelper"
+	import= "com.ptc.core.meta.common.TypeIdentifier"
+	import= "java.net.URL"
+	import= "java.util.*"
+	import= "java.sql.*"
+	import= "wt.workflow.notebook.*"
+%>
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+   
+<!--com.infoengine.soap.rpc.def
+
+-->
+
+<ie:unit>  
+  	<ie:init>
+		<ie:webject name="Start-Session" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="AUTHORIZATION" data="${@SERVER[]authorization[]}"/>
+			<ie:param name="GROUP_OUT" data="session"/>				
+		</ie:webject>
+
+		<ie:webject name="Start-Transaction" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			<ie:param name="AUTHORIZATION" data="${@SERVER[]authorization[]}"/>
+		</ie:webject>
+	</ie:init>
+	
+			<ie:webject name="Search-Objects" type="OBJ"> 
+				<ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+				<ie:param name="INSTANCE"        	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="AUTHORIZATION"   	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+				<ie:param name="VERSION"			data="LATEST" />
+				<ie:param name="TYPE"			 	data="wt.org.WTGroup" default="wt.fc.WTObject" delim="," />
+				<ie:param name="WHERE"				data="(name='Obras')|(name='Interiorismo')|(name='Coordinación Interiorismo')|(name='Expansión')|(name='Gestión Inmobiliaria')|(name='Gestión Materiales')" default="()"/>
+				<ie:param name="ATTRIBUTE"		 	data="obid,name,containerReference" delim=","/>
+				<ie:param name="GROUP_OUT"       	data="groups"/>
+			</ie:webject>
+
+<%
+				WTGroup group = null;
+				WTObject obj = null;
+				WTUser usr = null;
+				WTPrincipal prin = null;
+				Enumeration users = null;
+				ReferenceFactory rf = new ReferenceFactory();
+				String gId = null;
+				String[] partesId;
+%>				
+				<ie:forEach groupIn="groups" groupOut="group"> 
+<%
+				try 
+				{
+					gId= (String)getGroup("group").getAttributeValue(0,"obid");
+					partesId = gId.split(":");
+					gId = partesId[0] + ":" + partesId[1] + ":" + partesId[2];
+				
+					group = (WTGroup)((WTPrincipalReference)rf.getReference(gId)).getPrincipal();
+					users = group.members();
+
+					while(users.hasMoreElements()) {
+						obj = (WTObject)users.nextElement();
+
+						if (obj instanceof WTUser)
+						{
+							usr = (WTUser)obj;
+							getGroup("group").addAttributeValue(0, "user", usr.getAuthenticationName() );						
+						}
+					}
+				}
+				catch (WTException ex) 
+				{
+					ex.printStackTrace();
+				}
+%>
+				</ie:forEach>
+				
+			<ie:webject name="Sort-Group" type="GRP">
+				<ie:param name="GROUP_IN"   data="groups"/>
+				<ie:param name="SORTBY"	    data="name" delim=","/>
+				<ie:param name="GROUP_OUT"  data="output"/>
+			</ie:webject>
+	
+	<ie:success>
+		<ie:webject name="Commit-Transaction" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+		</ie:webject>
+
+		<ie:webject name="End-Session" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+		</ie:webject>
+	</ie:success>
+		
+	<ie:failure>
+    	<ie:webject name="Rollback-Transaction" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+		</ie:webject>
+
+		<ie:webject name="End-Session" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+		</ie:webject>
+
+		<ie:webject name="Throw-Exception" TYPE="MGT"/>
+	</ie:failure>
+</ie:unit>
+

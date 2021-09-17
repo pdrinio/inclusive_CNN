@@ -1,0 +1,57 @@
+<?xml version="1.0" standalone="yes"?>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="java.util.Enumeration,java.io.File,wt.util.*"%>
+<%@page import="wt.httpgw.WTURLEncoder"%>
+
+<!--com.infoengine.soap.rpc.def
+E-mails one or more ContentItem objects.
+-->
+
+<!--com.infoengine.soap.rpc.def
+@param string from		Remitente del correo
+@param string to		Destinatarios del correo separados por ;
+@param string cc		Destinatarios en copia separados por ;
+@param string bcc		Destinatarios en copia oculta separados por ;
+@param string subject	Título del correo
+@param string body		Texto del correo
+@param string docId		Id del objeto que se quiere adjuntar al correo
+-->
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+  String mailServer = wtprops.getProperty("wt.mail.mailhost");
+  String idDoc = (String)getParam("docId" , "");
+  Group content = null;
+  
+	if (idDoc.contains(":")) {
+%>
+	<ie:webject name="List-ContentItems" type="OBJ">
+	  <ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+	  <ie:param name="INSTANCE"        	data="<%= wtInstance %>" default="Windchill"/>
+      <ie:param name="AUTHORIZATION"   	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+	  <ie:param name="OBJECT_REF" 	   	data="${@FORM[]docId[0]}" />
+	  <ie:param name="GROUP_OUT" 	   	data="content" />
+	</ie:webject>
+<%
+	content = getGroup("content");
+	}	
+%>	
+	<ie:webject name="Send-Mail" type="MSG">		
+		<ie:param name="FROM" 			data="${@FORM[]from[]}" />
+		<ie:param name="TO" 			data="${@FORM[]to[]}" valueSeparator=";" delim=";" />
+		<ie:param name="CC" 			data="${@FORM[]cc[]}" valueSeparator=";" delim=";" />
+		<ie:param name="BCC" 			data="${@FORM[]bcc[]}" valueSeparator=";" delim=";" />
+		<ie:param name="SUBJECT" 		data="${@FORM[]subject[]}" />
+		<ie:param name="CONTENT" 		data="${@FORM[]body[0]}" />
+<%
+		if ((content != null) && (content.getElementCount() > 0)) {
+%>		
+		<ie:param name="CONTENT_URL"	data="${content[]urlLocation[]}" />
+<%
+		}
+%>		
+		<ie:param name="MAIL_SERVER" 	data="<%=mailServer%>" />
+		<ie:param name="HEADERS_CHARSET"data="iso-8859-1" />
+		<ie:param name="GROUP_OUT" 		data="output"/>
+	</ie:webject>

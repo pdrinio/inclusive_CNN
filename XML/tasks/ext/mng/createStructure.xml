@@ -1,0 +1,524 @@
+<?xml version="1.0" standalone="yes"?>
+<%@page language="java" session="false"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import= "java.util.*"
+	import= "wt.pdmlink.PDMLinkProduct"
+    import= "wt.session.SessionHelper"        	          
+	import= "wt.inf.template.*"
+	import= "wt.inf.container.*"
+	import= "wt.fc.*"
+	import= "wt.fc.collections.*"
+	import= "wt.org.*"
+	import= "wt.admin.*"
+	import= "wt.util.*"
+	import= "wt.type.*"
+	import= "wt.part.*"	
+	import= "wt.folder.*"
+	import= "wt.inf.library.*"	
+	import= "com.ptc.core.foundation.type.server.impl.TypeHelper"
+	import= "com.ptc.core.foundation.type.common.TypeIdentifierSelectionHelper"
+	import= "com.ptc.core.meta.common.TypeIdentifier"
+	import= "java.net.URL"
+	import= "java.util.*"
+	import= "java.sql.*"
+	import= "wt.workflow.notebook.*"
+%>
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+   
+<!--com.infoengine.soap.rpc.def
+
+@param string idPlantilla 		Obid del container (producto/libreria) de la la plantilla a aplicar
+@param string idContainer 		Obid del container (producto/libreria) en el que se va a crear el part y la carpeta
+@param string tipoPart 			Tipo del part que se va a crear
+@param string nombrePart 		El nombre del nuevo elemento
+@param string tipoCarpeta		Tipo da la carpeta que se va a crear
+@param string atributosPart 	Lista de pares atributo=valor separados por ;
+@param string esTiendaPropia	Indica si la tienda es propia a efectos de la generacion de los hitos
+@param string diasAvisoHitos	Numero de dias de antelacion para realizar el aviso de los hitos
+@param string parentPart 		Id del part padre al que se tiene que asociar (BOM) el nuevo part creado
+@param string descripcionPadre	Descripcion de la entidad padre que se va a crear (Solo sera valido para el caso de entidades que generen avisos)
+@param string ignorarFolderPlantilla	tipo de una carpeta existente en la plantilla que no se va a crear 
+-->
+
+<ie:unit>  
+  	<ie:init>
+		<ie:webject name="Start-Session" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="AUTHORIZATION" data="${@SERVER[]authorization[]}"/>
+			<ie:param name="GROUP_OUT" data="session"/>				
+		</ie:webject>
+
+		<ie:webject name="Start-Transaction" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			<ie:param name="AUTHORIZATION" data="${@SERVER[]authorization[]}"/>
+		</ie:webject>
+	</ie:init>
+	
+<%
+		// Variables globales
+		String nameLib, idContainer, subDir, dirPadre, newFolder, idFolder, parentPart, folderToSkip;
+		String[] partesId;
+		Stack<String> dirs = new Stack<String>();		// Pila para almacenar los directorios que hay que crear
+		Stack<String> padres = new Stack<String>();		// Pila para almacenar los directorios padre de cada carpeta a crear
+%>
+
+		<!-- Recuperamos la librería  creada mediante tarea ya que getIdentity() no devuelve el id	-->
+		<ie:webject name="Query-Objects" type="OBJ">
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="INSTANCE"	data="<%= wtInstance %>" default="Windchill"/>        
+			<ie:param name="OBJECT_REF"		 data="${@FORM[]idContainer[]}"/>
+			<ie:param name="GROUP_OUT"	data="libDestino"/>
+		</ie:webject> 
+	
+		<!-- Recuperamos el producto con la estructura de carpetas	-->
+		<ie:webject name="Query-Objects" type="OBJ">
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="INSTANCE"	data="<%= wtInstance %>" default="Windchill"/>        
+			<ie:param name="OBJECT_REF"		 data="${@FORM[]idPlantilla[]}"/>
+			<ie:param name="GROUP_OUT"	data="plantillaCarpetas"/>
+		</ie:webject>
+	
+		<!-- Creamos la carpeta que representa al objeto -->
+		<ie:webject name="Create-Object" type="ACT">
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" 	data="${session[]session_id[0]}"/>
+			<ie:param name="TYPE" 			data="${@FORM[]tipoCarpeta[]}" default ="wt.folder.SubFolder" />
+			<ie:param name="CONTAINER_REF"	data="${@FORM[]idContainer[]}"/>	
+			<ie:param name="FIELD" 			data="name=${@FORM[]nombrePart[]}"/>
+			<ie:param name="FIELD" 			data="folder.id=<%= (String) getGroup("libDestino").getAttributeValue(0,"containerInfo.defaultCabinetRef") %>"/>
+			<ie:param name="GROUP_OUT" 		data="folder"/>
+		</ie:webject>
+<%
+		idFolder = (String) getGroup("folder").getAttributeValue(0,"obid");
+		partesId = idFolder.split(":");
+		idFolder = partesId[0] + ":" + partesId[1] + ":" + partesId[2];
+%>
+		<!-- Creamos el part final que representa al objeto -->
+		<ie:webject name="Create-Object" type="ACT">
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" 	data="${session[]session_id[0]}"/>
+			<ie:param name="TYPE" 			data="${@FORM[]tipoPart[]}"/>
+			<ie:param name="CONTAINER_REF"	data="${@FORM[]idContainer[]}"/>	
+			<ie:param name="FIELD" 			data="name=${@FORM[]nombrePart[]}"/>
+			<ie:param name="FIELD" 			data="${@FORM[]atributosPart[]}" valueSeparator=";" delim=";"/>
+			<ie:param name="FIELD" 			data="IdCarpeta=<%= idFolder %>"/>
+			<ie:param name="GROUP_OUT" 		data="part"/>
+		</ie:webject>	
+
+<%		
+		////////////////////////////////////////////////////////////////
+		/// En caso de que exista el parametro parentPart, tendremos ///
+		/// que establecer el despiece								 ///
+		////////////////////////////////////////////////////////////////
+		parentPart = (String) getParam("parentPart");
+		
+		if ((parentPart != null) && (parentPart.length()  > 0))
+		{
+%>
+			<ie:webject name="Checkout-Objects" type="ACT">
+				<ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+				<ie:param name="INSTANCE"			data="<%= wtInstance %>" default="Windchill"/>        
+				<ie:param name="SESSION_ID" 		data="${session[]session_id[0]}"/>
+				<ie:param name="OBJECT_REF" 		data="<%= parentPart %>"/>
+				<ie:param name="COMMENT" 			data=""/>
+				<ie:param name="GROUP_OUT" 			data="checkout"/>
+				</ie:webject>
+			<ie:webject name="Query-Master" type="OBJ">
+				<ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+				<ie:param name="INSTANCE"			data="<%= wtInstance %>" default="Windchill"/>        
+				<ie:param name="SESSION_ID" 		data="${session[]session_id[0]}"/>
+				<ie:param name="OBJECT_REF" 		data="${part[]obid[]}"/>
+				<ie:param name="GROUP_OUT"			data="master"/>
+			</ie:webject>
+			<ie:webject name="Create-Object" type="ACT">
+				<ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+				<ie:param name="INSTANCE" 			data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" 		data="${session[]session_id[0]}"/>
+				<ie:param name="TYPE" 				data="wt.part.WTPartUsageLink"/>
+				<ie:param name="FIELD"  			data="usedBy=${checkout[0]obid[]}"/>
+				<ie:param name="FIELD"    			data="uses=${master[0]obid[]}"/>
+				<ie:param name="FIELD"	     		data="quantity.amount=1"/>
+				<ie:param name="FIELD"		 		data="quantity.unit=ea"/>
+			</ie:webject>	
+			<ie:webject name="Checkin-Objects" type="ACT">
+				<ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+				<ie:param name="INSTANCE" 			data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" 		data="${session[]session_id[0]}"/>
+				<ie:param name="object_ref" 		data="<%= parentPart %>"/>
+				<ie:param name="comment" 			data=""/>
+				<ie:param name="group_out" 			data="checkin"/>
+			</ie:webject>
+<%
+		}
+		////////////////////////////////////////////////////////////////
+%>
+
+		
+<%	  
+		folderToSkip = (String) getParam("ignorarFolderPlantilla");
+		idContainer = (String) getGroup("libDestino").getAttributeValue(0,"obid");
+		newFolder = idFolder;
+		idFolder = (String) getGroup("plantillaCarpetas").getAttributeValue(0,"containerInfo.defaultCabinetRef");
+		padres.push(newFolder);
+		dirs.push(idFolder);
+	  
+		while ((!dirs.empty()) && (!padres.empty()) && (idContainer.length() > 0))
+		{	   	
+			idFolder = dirs.pop();
+			dirPadre = padres.pop();	   
+%>
+			<!-- Recuperamos el contenido de la carpeta actual -->
+			<ie:webject name="List-FolderContents" type="OBJ">
+				<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+				<ie:param name="INSTANCE"        	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" 		data="${session[]session_id[0]}"/>
+				<ie:param name="AUTHORIZATION"   	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+				<ie:param name="OBJECT_REF" 	   	data="<%= idFolder %>" />
+				<ie:param name="GROUP_OUT" 	   	data="contents" />
+			</ie:webject>
+		
+			<!-- Subgrupo que contiene sólo las carpetas -->
+			<ie:webject name="Subset-Group" type="GRP">
+				<ie:param name="FILTER_TYPE" 	data="IE"/>	
+				<ie:param name="FILTER_MODE" 	data="MATCH"/>
+				<ie:param name="GROUP_IN" 	data="contents"/>
+				<ie:param name="FILTER" 		data="class='*wt.folder.*'"/>
+				<ie:param name="GROUP_OUT" 	data="folders"/>
+			</ie:webject>
+<%
+			if((folderToSkip != null) && (folderToSkip.length() > 0)) {
+%>
+				<ie:webject name="Subset-Group" type="GRP">
+					<ie:param name="FILTER_TYPE" 	data="IE"/>	
+					<ie:param name="FILTER_MODE" 	data="NOMATCH"/>
+					<ie:param name="GROUP_IN" 	data="folders"/>
+					<ie:param name="FILTER" 		data="class='*<%= folderToSkip %>'"/>
+					<ie:param name="GROUP_OUT" 	data="folders"/>
+				</ie:webject>
+<%
+			}
+%>			
+			<ie:forEach groupIn="folders" groupOut="folder">
+			
+				<!-- Creamos la carpeta en la nueva librería -->
+				<ie:webject name="Create-Object" type="ACT">
+					<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+					<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="SESSION_ID" 	data="${session[]session_id[0]}"/>
+					<ie:param name="TYPE" 			data="${folder[]class[]}"/>
+					<ie:param name="CONTAINER_REF" 	data="<%= idContainer %>"/>
+					<ie:param name="FIELD" 			data="name=${folder[]name[]}"/>				
+					<ie:param name="FIELD" 			data="folder.id= <%= dirPadre %>"/> 	
+					<ie:param name="GROUP_OUT" 		data="newFolder"/>
+				</ie:webject>	   
+<%
+				newFolder = (String) getGroup("newFolder").getAttributeValue(0,"obid");
+				partesId = newFolder.split(":");
+				newFolder = partesId[0] + ":" + partesId[1] + ":" + partesId[2];
+
+				subDir = (String) getGroup("folder").getAttributeValue(0,"obid");
+				partesId = subDir.split(":");
+				subDir = partesId[0] + ":" + partesId[1] + ":" + partesId[2];
+				
+				// Actualizamos las pilas
+				dirs.push(subDir);
+				padres.push(newFolder);			
+%>		
+			</ie:forEach>
+
+<%	   
+		}  // Bucle WHILE
+		
+		
+		
+		
+		// --------------------------------------------------------------------------------
+		// ------------- CREACION DE HITOS PARA LA TIENDA / PROYECTO ----------------------
+		// --------------------------------------------------------------------------------
+		if ((getParam("diasAvisoHitos") != null) &&(getParam("diasAvisoHitos") != null) && (!((String)getParam("diasAvisoHitos")).equals("0"))) 
+		{
+			String server = wtprops.getProperty("ext.mng.pdm.db.server");
+			String port = wtprops.getProperty("ext.mng.pdm.db.port");
+			String instance = wtprops.getProperty("ext.mng.pdm.db.instance");
+			String database = wtprops.getProperty("ext.mng.pdm.db.database");
+			String user = wtprops.getProperty("ext.mng.pdm.db.user");
+			String password = wtprops.getProperty("ext.mng.pdm.db.pwd");
+		
+			if ((server != null) && (port != null) && (instance != null) && (database != null) && (user != null) && (password != null)) 
+			{
+				String connectionUrl = "jdbc:sqlserver://" + server + ":" + port + ";instanceName=" + instance + ";databaseName=" + database + ";user=" + user + ";password=" + password;
+				
+				// Declare the JDBC objects.
+				Connection con = null;
+				Statement stmt = null;
+				CallableStatement cstmt = null;
+		
+				// --------------------------------------------------------------------------------
+				// ---------------------- OBTENEMOS LOS GRUPOS Y LOS USUARIOS ---------------------
+				// --------------------------------------------------------------------------------
+%>
+				<ie:webject name="Search-Objects" type="OBJ"> 
+					<ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+					<ie:param name="INSTANCE"        	data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="AUTHORIZATION"   	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+					<ie:param name="VERSION"			data="LATEST" />
+					<ie:param name="TYPE"			 	data="wt.org.WTGroup" default="wt.fc.WTObject" delim="," />
+					<ie:param name="WHERE"				data="(name='Obras')|(name='Interiorismo')|(name='Coordinación Interiorismo')|(name='Expansión')|(name='Gestión Inmobiliaria')|(name='Gestión Materiales')" default="()"/>
+					<ie:param name="ATTRIBUTE"		 	data="obid,name,containerReference" delim=","/>
+					<ie:param name="GROUP_OUT"       	data="groups"/>
+				</ie:webject>
+
+<%
+				WTGroup group = null;
+				WTObject obj = null;
+				WTUser usr = null;
+				WTPrincipal prin = null;
+				Enumeration users = null;
+				ReferenceFactory rf = new ReferenceFactory();
+				String gId = null;
+				int updateCount = 0;
+				StringBuffer command = null;
+				
+				//////////////////////////////////
+				/// INICIALIZAMOS LA CONEXION  ///
+				//////////////////////////////////
+				try 
+				{
+					// Establish the connection.
+					Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
+					con = DriverManager.getConnection(connectionUrl);
+					con.setAutoCommit(false);
+					con.setTransactionIsolation(com.microsoft.sqlserver.jdbc.SQLServerConnection.TRANSACTION_SERIALIZABLE);
+					
+					// Creamos la sentencia
+					stmt = con.createStatement();
+				}
+				catch (Exception ex)
+				{
+					if (stmt != null) try { stmt.close(); } catch(Exception e) { e.printStackTrace(); }
+					if (con != null) try { con.close(); } catch(Exception e) { e.printStackTrace(); }
+					
+					ex.printStackTrace();
+%>
+					<ie:webject name="Throw-Exception" type="MGT">
+						<ie:param name="CLASS" data="wt.util.WTException"/>
+						<ie:param name="MESSAGE" data="Error creando la conexion a la Base de Datos"/>
+					</ie:webject>
+<%
+				}
+				//////////////////////////////////
+				
+				
+				try {
+					//Realizamos el borrado de los usuarios existentes en la tabla
+					stmt.execute("DELETE FROM dbo.GrupoUsuario");
+%>
+					<ie:forEach groupIn="groups" groupOut="group"> 
+<%
+						try 
+						{
+							gId= (String)getGroup("group").getAttributeValue(0,"obid");
+							partesId = gId.split(":");
+							gId = partesId[0] + ":" + partesId[1] + ":" + partesId[2];
+						
+							group = (WTGroup)((WTPrincipalReference)rf.getReference(gId)).getPrincipal();
+							users = group.members();
+		
+							while(users.hasMoreElements()) {
+								obj = (WTObject)users.nextElement();
+	
+								if (obj instanceof WTUser)
+								{
+									usr = (WTUser)obj;
+									
+									command =  new StringBuffer();
+									command.append("INSERT INTO dbo.GrupoUsuario ");
+									command.append("(idGrupo, nombreGrupo, idUsuario, loginUsuario, nombreUsuario, emailUsuario)");
+									command.append("	VALUES (");
+									if (gId.toLowerCase().startsWith("or:") || gId.toLowerCase().startsWith("vr:"))
+									{
+										command.append("'" + gId.substring(3) + "'");
+									}
+									else
+									{
+										command.append("'" + gId + "'");
+									}
+									command.append(","); 
+									command.append("'" + (String)getGroup("group").getAttributeValue(0,"name") + "'");
+									command.append(","); 
+									command.append("'" + PersistenceHelper.getObjectIdentifier(usr).toString() + "'");
+									command.append(","); 
+									command.append("'" + usr.getAuthenticationName() + "'");
+									command.append(","); 
+									command.append("'" + usr.getFullName() + "'");
+									command.append(","); 
+									command.append("'" + usr.getEMail() + "'");
+									command.append(")");
+									
+									stmt.addBatch(command.toString());
+									updateCount += 1;
+								}
+							}
+						}
+						catch (WTException ex) 
+						{
+							ex.printStackTrace();
+						}
+%>
+					</ie:forEach>
+<%
+					int[] updateCounts = stmt.executeBatch();
+					
+					for (int i :updateCounts) 
+					{
+						updateCount = updateCount -i;
+					}
+				
+				}
+				catch (Exception ex) 
+				{
+					try {
+						con.rollback();
+					}
+					catch (SQLException se) {
+						se.printStackTrace();
+					}
+					if (stmt != null) try { stmt.close(); } catch(Exception e) { e.printStackTrace(); }
+					if (con != null) try { con.close(); } catch(Exception e) { e.printStackTrace(); }
+					
+					ex.printStackTrace();
+%>
+					<ie:webject name="Throw-Exception" type="MGT">
+						<ie:param name="CLASS" data="wt.util.WTException"/>
+						<ie:param name="MESSAGE" data="Error obteniendo grupos y usuarios para la creacion de hitos"/>
+					</ie:webject>
+<%
+				}
+				// --------------------------------------------------------------------------------		
+				
+				
+				
+				int diasAviso = Integer.parseInt((String) getParam("diasAvisoHitos"));
+				String esTiendaPropia = (String) getParam("esTiendaPropia");
+				if (esTiendaPropia == null) {
+					esTiendaPropia = "1";
+				}
+				String idPart = (String) getGroup("part").getAttributeValue(0,"obid");
+				partesId = idPart.split(":");
+				idPart = partesId[0] + ":" + partesId[1] + ":" + partesId[2];
+				String descrPadre = (String) getParam("descripcionPadre");
+				if (descrPadre == null) {
+					descrPadre = "";
+				}
+				
+				try {
+					cstmt = con.prepareCall("{? = call dbo.initHitosProyecto(?,?,?,?)}");
+					cstmt.registerOutParameter(1, java.sql.Types.INTEGER);
+					cstmt.setString(2, idPart);
+					if (esTiendaPropia.equals("0")) 
+					{
+						cstmt.setBoolean(3, false);
+					} 
+					else 
+					{
+						cstmt.setBoolean(3, true);
+					}
+					cstmt.setInt(4, diasAviso);
+					cstmt.setString(5 , descrPadre);
+					cstmt.execute();
+				}
+				catch (Exception ex) {
+					try {
+						con.rollback();
+					}
+					catch (SQLException se) {
+						se.printStackTrace();
+					}
+					if (stmt != null) try { stmt.close(); } catch(Exception e) { e.printStackTrace(); }
+					if (cstmt != null) try { cstmt.close(); } catch(Exception e) { e.printStackTrace(); }
+					if (con != null) try { con.close(); } catch(Exception e) { e.printStackTrace(); }
+					
+					ex.printStackTrace();
+%>
+					<ie:webject name="Throw-Exception" type="MGT">
+						<ie:param name="CLASS" data="wt.util.WTException"/>
+						<ie:param name="MESSAGE" data="Error ejecutando procedimiento almacenado de creacion de hitos"/>
+					</ie:webject>
+<%
+				}
+				
+				
+				/////////////////////////////////
+				/// FINALIZAMOS LA TRANSACCION //
+				/////////////////////////////////
+				try 
+				{
+					con.commit();
+					if (stmt != null) try { stmt.close(); } catch(Exception e) { e.printStackTrace(); }
+					if (cstmt != null) try { cstmt.close(); } catch(Exception e) { e.printStackTrace(); }
+					if (con != null) try { con.close(); } catch(Exception e) { e.printStackTrace(); }
+				}
+				catch (Exception e) 
+				{
+					e.printStackTrace(); 
+%>
+					<ie:webject name="Throw-Exception" type="MGT">
+						<ie:param name="CLASS" data="wt.util.WTException"/>
+						<ie:param name="MESSAGE" data="Error guardando cambios en la Base de Datos"/>
+					</ie:webject>
+<%					
+				}
+				/////////////////////////////////
+			} 
+			else 
+			{
+				//ERROR: No estan definidas todas las propiedades necesarias
+%>
+				<ie:webject name="Throw-Exception" type="MGT">
+					<ie:param name="CLASS" data="wt.util.WTException"/>
+					<ie:param name="MESSAGE" data="Faltan parametros de configuracion para conectar a BD de PDM"/>
+				</ie:webject>
+<%
+			}	
+		}
+%>	
+
+		<ie:webject name="Sort-Group" type="GRP">
+			<ie:param name="GROUP_IN"   data="part"/>
+			<ie:param name="SORTBY"	    data="obid" delim=","/>
+			<ie:param name="GROUP_OUT"  data="output"/>
+		</ie:webject>
+	
+	<ie:success>
+		<ie:webject name="Commit-Transaction" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+		</ie:webject>
+
+		<ie:webject name="End-Session" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+		</ie:webject>
+	</ie:success>
+		
+	<ie:failure>
+    	<ie:webject name="Rollback-Transaction" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+		</ie:webject>
+
+		<ie:webject name="End-Session" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+		</ie:webject>
+
+		<ie:webject name="Throw-Exception" TYPE="MGT"/>
+	</ie:failure>
+</ie:unit>
+

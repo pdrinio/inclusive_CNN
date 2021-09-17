@@ -1,0 +1,58 @@
+<%@page language="java" import="com.infoengine.au.NamingService"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string obid
+@param string tabla
+-->
+
+<%
+	String obid = (String)getParam("obid", null);
+	String tabla = (String)getParam("tabla", "WTPartDescribeLink");
+	int result = -1;
+
+	if (obid != null) {
+		//Campos a modificar en la tarea
+		String db = "jdbc:sqlserver://192.168.200.10;instanceName=SQLWC;databaseName=wcadmin";
+		String user = "sa";
+		String pass = "prsql";
+		String esquema = "wcadmin.";
+		
+		java.sql.Connection connection = null;
+		String SQLDelete = "delete from " + esquema + tabla + " where idA2A2=" + obid;
+	
+		try {
+			//Obtenemos la conexión
+			Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
+			connection = java.sql.DriverManager.getConnection(db, user, pass);
+					
+			java.sql.Statement stat = connection.createStatement();
+			result = (int)stat.executeUpdate(SQLDelete);
+		
+			connection.close();
+		} catch (Exception e) {
+			try {
+				connection.close();
+			} catch (Exception e1) {
+			}
+			result = -1;
+			java.util.logging.Logger.getLogger("windchill.workflow.java.updateExternalDB.true").log(java.util.logging.Level.SEVERE, null, e);
+		}
+	}
+%>
+
+	<ie:webject name="Create-Group" type="GRP">
+		<ie:param name="ELEMENT"	data="<%= "count=" + result %>"/>
+		<ie:param name="GROUP_OUT"	data="output"/>
+	</ie:webject>
+
+
+
+
+

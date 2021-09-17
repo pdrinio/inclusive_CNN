@@ -1,0 +1,23 @@
+<%@page language="java" import="com.infoengine.au.NamingService,wt.util.*"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string documentId id del objeto del que se quiere obtener informacion sobre su contenido
+-->
+
+<ie:unit>
+
+<ie:webject name="List-ContentItems" type="OBJ">
+	  <ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+	  <ie:param name="INSTANCE"        	data="<%= wtInstance %>" default="Windchill"/>
+      <ie:param name="AUTHORIZATION"   	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+	  <ie:param name="OBJECT_REF" 	   	data="${@FORM[]documentId[0]}" />
+	  <ie:param name="GROUP_OUT" 	   	data="output" />
+</ie:webject>
+
+</ie:unit>

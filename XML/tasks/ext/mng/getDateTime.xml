@@ -1,0 +1,22 @@
+<%@page language="java" import="com.infoengine.au.NamingService,java.util.*,java.text.*,com.infoengine.object.*"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+	<ie:webject name="Create-Group" type="GRP">
+		<ie:param name="GROUP_OUT" 	data="DateTime"/>
+		<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+	</ie:webject>
+<%
+	Group dateTime = getGroup("DateTime");
+
+	Date fecha = new Date();	
+	SimpleDateFormat sdf =  new SimpleDateFormat("dd/MM/yyyy HH:mm");
+	TimeZone cetTime = TimeZone.getTimeZone("CET");	
+	
+	try {
+		sdf.setTimeZone(cetTime);
+		dateTime.setAttributeValue(0, "DateTime", sdf.format(fecha));		
+	}
+	catch (Exception ex) {
+		dateTime.setAttributeValue(0, "DateTime", "01/01/1900 00:00");
+	}		
+%>

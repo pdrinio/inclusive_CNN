@@ -1,0 +1,210 @@
+<%@page language="java" import="com.infoengine.au.NamingService, java.net.*, wt.util.*, wt.content.*, wt.fc.*"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.delegate.def
+@comment Tarea de búsqueda de objetos 
+@delegateName searchObjects
+-->
+
+<!--com.infoengine.soap.rpc.def
+@param string tipos			Los tipos de los objetos a buscar separados por ,
+@param string filtro		Filtro a aplicar en la búsqueda
+@param string container		Parámetro opcional para indicar un container en el que realizar la búsqueda
+@param string getAtrsFile	Parámetro opcional para indicar si se quieren recuperar atributos del objeto ApplicationData
+-->	
+
+<ie:unit>
+	<ie:init>
+		<ie:webject name="Start-Session" type="ACT">
+			<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="BLOB_COUNT" data="0" />
+			<ie:param name="GROUP_OUT" 	data="session"/>
+		</ie:webject>
+    
+		<ie:webject name="Start-Transaction" type="ACT">
+			<ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+	</ie:init>
+  
+	<ie:webject name="Create-Group" type="GRP">
+		<ie:param name="GROUP_OUT" 	data="results"/>
+		<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+	</ie:webject>  
+<%
+	String strTipos = (String)getParam("tipos" , "");
+	String listTipos[] = strTipos.split(",");
+	String container = (String)getParam("container", "");
+	String filtro = (String)getParam("filtro", "");
+	String getAtrsFile = (String)getParam("getAtrsFile", "false");
+	String CREATOR = "iterationInfo.creator";
+	String searchUser = null;
+	String modoFiltro = "MATCH";	
+	Integer posIni, posIniName, posFin;
+	Character operador;
+	Group search, obj;
+	
+	ReferenceFactory rfo = new ReferenceFactory();
+	Persistable po;
+	ContentHolder ch;
+	ContentItem content;
+	ApplicationData appData;
+	String oid, clase;
+	
+	if (filtro.contains(CREATOR)) {
+		posIni = filtro.indexOf(CREATOR);
+		operador = filtro.charAt(posIni + CREATOR.length());
+		if (operador.toString().equals("=")) {
+			modoFiltro = "MATCH";
+		}
+		else {
+			modoFiltro = "NOMATCH";
+		}
+		
+		posIniName = filtro.indexOf("'", posIni) + 1;
+		posFin = filtro.indexOf("'", posIniName);
+		searchUser = filtro.substring(posIniName, posFin);
+		filtro = filtro.substring(0, posIni).concat(filtro.substring(posFin + 1, filtro.length()));		
+	}
+	
+	if (filtro.contains("<>")) {
+		filtro = filtro.replace("<>", "!=");
+	}
+	
+	for (String tipo:listTipos) {
+%>		
+		<ie:webject name="Search-Objects" type="OBJ"> 
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="INSTANCE"        	data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="AUTHORIZATION"   	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+<%		if (container.length() > 0) {		%>	
+			<ie:param name="CONTAINER_REF"		data="${@FORM[]container[]}"	delim=","/>
+<%		}									%>	
+			<ie:param name="VERSION"			data="LATEST" />
+			<ie:param name="TYPE"			 	data="<%= tipo %>"  default="wt.fc.WTObject" delim="," />
+			<ie:param name="WHERE"				data="<%= filtro %>" default="()"/>
+			<ie:param name="ATTRIBUTE"		 	data="name,masterReference,number,revision,state.state,iterationInfo.creator" delim=","/>
+			<ie:param name="GROUP_OUT"       	data="search"/>
+		</ie:webject>
+
+<%
+		if (searchUser != null) {
+%>		
+			<ie:webject name="Query-Objects" type="OBJ">
+				<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>        
+				<ie:param name="TYPE"		data="wt.org.WTUser"/>
+				<ie:param name="WHERE"		data="(name='<%= searchUser %>*')|(fullName='<%= searchUser %>*')"/>
+				<ie:param name="GROUP_OUT"	data="user"/>
+			</ie:webject> 
+					
+			<ie:webject name="Subset-Group" type="GRP">
+				<ie:param name="FILTER_TYPE" data="IE"/>
+				<ie:param name="FILTER_MODE" data="<%= modoFiltro %>" default="MATCH"/>
+				<ie:param name="GROUP_IN" 	 data="search"/>
+				<ie:param name="FILTER" 	 data="iterationInfo.creator='<%= getGroup("user").getAttributeValue(0, "obid")%>'"/>
+				<ie:param name="GROUP_OUT" 	 data="search"/>
+			</ie:webject>
+<%
+		}	
+
+		search = getGroup("search");
+		if (search.getElementCount() > 0) {
+			clase = search.getAttributeValue(0, "class").toString();
+			if (getAtrsFile.equals("true") && !(clase.contains("wt.part.WTPart"))) {
+%>
+				<ie:forEach groupIn="search" groupOut="obj">
+<%
+					obj = getGroup("obj");
+					oid = obj.getAttributeValue(0, "obid").toString();
+					if ((oid != null) && (oid.contains(":"))) {
+						oid = oid.split(":")[0] + ":" + oid.split(":")[1] + ":" + oid.split(":")[2];
+						po = rfo.getReference(oid).getObject();
+						ch = (ContentHolder) po;
+						ch = ContentHelper.service.getContents(ch);
+						content = ContentHelper.getPrimary((FormatContentHolder) ch);
+						
+						if (content != null) {
+							appData = (ApplicationData) content;
+						} else {
+							appData = null;
+						}
+						
+						if (appData != null) {														
+							obj.setAttributeValue(0, "obid.fileSize", appData.getFileSize());
+							obj.setAttributeValue(0, "obid.fileName", appData.getFileName());							
+						}
+					}				
+%>		
+				</ie:forEach>
+<%
+			}
+%>
+			<ie:webject name="Expand-References" type="OBJ">
+				<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="REFERENCE" 	data="obid"/>
+				<ie:param name="GROUP_IN" 	data="search"/>
+				<ie:param name="GROUP_OUT" 	data="docs"/>
+			</ie:webject>
+			
+			<ie:webject name="Concat-Groups" type="GRP">
+				<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+				<ie:param name="GROUP_IN" 	data="docs"/>
+				<ie:param name="GROUP_IN" 	data="results"/>
+				<ie:param name="GROUP_OUT" 	data="results"/>
+			</ie:webject>		
+<%			
+		}
+	}
+%>		
+	<ie:success>
+		<ie:webject name="Commit-Transaction" type="ACT">
+			<ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+    
+		<ie:webject name="End-Session"	type="ACT">
+			<ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+	</ie:success>
+
+	<ie:failure>
+		<ie:webject name="Rollback-Transaction" type="ACT">
+			<ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+    
+		<ie:webject name="End-Session"	type="ACT">
+			<ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+
+		<ie:webject name="Throw-Exception" type="MGT" />
+	</ie:failure>
+<%
+	try {
+%>
+	<ie:webject name="Sort-Group" type="GRP">
+		<ie:param name="GROUP_IN"   data="results"/>
+		<ie:param name="SORTBY"	    data="name" delim=","/>
+		<ie:param name="GROUP_OUT"  data="output"/>
+	</ie:webject>
+<%
+	} catch (Exception ex) {
+%>
+	<ie:webject name="Sort-Group" type="GRP">
+		<ie:param name="GROUP_IN"   data="results"/>
+		<ie:param name="SORTBY"	    data="obid" delim=","/>
+		<ie:param name="GROUP_OUT"  data="output"/>
+	</ie:webject>
+<%
+	}
+%>	
+</ie:unit>

@@ -1,0 +1,153 @@
+<%@page language="java" import="com.infoengine.au.NamingService"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder,java.util.regex.*,java.util.*,java.util.regex.Pattern"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.delegate.def
+@comment Servicio Web para agregar un proveedor a un artículo
+@delegateName agregarProveedor
+-->
+
+<!--com.infoengine.soap.rpc.def
+@param string idArticulo	Id del artículo
+@param string idTercero		Id del proveedor
+-->
+
+<%
+	Group grp;
+	String idArticuloProveedor = "";
+	String result = "result=false";	
+%>
+	<ie:unit>
+  		<ie:init>
+			<ie:webject name="Start-Session" type="ACT">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[]}"/>
+				<ie:param name="GROUP_OUT" 		data="session"/>				
+			</ie:webject>
+
+			<ie:webject name="Start-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" 	data="${session[]session_id[0]}"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[]}"/>
+			</ie:webject>
+		</ie:init>
+		
+		<ie:webject name="Search-Objects" type="OBJ">
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="INSTANCE"       data="<%= wtInstance %>"/>
+			<ie:param name="AUTHORIZATION"  data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+			<ie:param name="TYPE"			data="Tercero"/>
+			<ie:param name="WHERE"			data="(Id='${@FORM[]idTercero[]}')"/>
+			<ie:param name="ATTRIBUTE"		data="obid"/>
+			<ie:param name="GROUP_OUT"      data="proveedor"/>
+		</ie:webject>	
+<%
+		grp = getGroup("proveedor");
+		if (grp.getElementCount() > 0) {
+%>
+			<ie:webject name="Checkout-Objects" type="ACT">
+				<ie:param name="ACCEPT_LANGUAGE"	data="es-ES"/>
+				<ie:param name="INSTANCE" 			data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="OBJECT_REF"			data="${proveedor[]obid[]}"/>
+				<ie:param name="GROUP_OUT" 			data="checkout"/>
+			</ie:webject>
+
+			<ie:webject name="Query-Tree" type="OBJ">
+				<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="TYPE" 			data="wt.part.WTPartUsageLink"/>
+				<ie:param name="OBJECT_REF" 	data="${checkout[]obid[]}"/>
+				<ie:param name="DIRECTION" 		data="uses"/>
+				<ie:param name="DEPTH" 			data="1"/>
+				<ie:param name="SELECTBY" 		data="LATEST"/>				
+				<ie:param name="ATTRIBUTE" 		data="*"/>
+				<ie:param name="OUTPUT_TYPE"	data="FULL"/>
+				<ie:param name="GROUP_OUT" 		data="arbol"/>
+			</ie:webject>
+
+			<ie:webject name="Subset-Group" type="GRP">
+				<ie:param name="FILTER_TYPE" 	data="IE"/>	
+				<ie:param name="FILTER_MODE" 	data="MATCH"/>
+				<ie:param name="GROUP_IN" 		data="arbol"/>
+				<ie:param name="FILTER" 		data="Id='${@FORM[]idArticulo[]}'"/>
+				<ie:param name="GROUP_OUT" 		data="articulos"/>
+			</ie:webject>			
+					
+			<ie:forEach groupIn="articulos" groupOut="articulo">
+<%
+				grp = getGroup("articulo");
+				idArticuloProveedor = "";
+				for (Element elemento:grp.getElementList()) {
+					Enumeration atributos = elemento.getAtts();
+					Att atributo = null;
+
+					while (atributos.hasMoreElements()) {
+						atributo = (Att)atributos.nextElement();
+						if (atributo.getName().endsWith(".ArticuloProveedor.obid")) {
+							idArticuloProveedor = atributo.getValue().toString();
+							break;
+						}
+					}
+					if (idArticuloProveedor.length() > 0) {
+						break;
+					}
+				}
+				if (idArticuloProveedor.length() > 0) {
+%>
+					<ie:webject name="Delete-Objects" type="ACT">
+						<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+						<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+						<ie:param name="OBJECT_REF"   	data="<%= idArticuloProveedor %>"/>
+						<ie:param name="GROUP_OUT" 		data="delete"/>
+					</ie:webject>
+<%
+				}
+%>
+			</ie:forEach>
+				
+			<ie:webject name="Checkin-Objects" type="ACT">
+				<ie:param name="ACCEPT_LANGUAGE"	data="es-ES"/>
+				<ie:param name="INSTANCE" 			data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="OBJECT_REF"			data="${proveedor[]obid[]}"/>
+				<ie:param name="GROUP_OUT" 			data="checkin"/>
+			</ie:webject>
+<%
+			result = "result=true";
+		}
+%>			
+		<ie:webject name="Create-Group" type="GRP">
+			<ie:param name="ELEMENT"	data="<%= result %>"/>
+			<ie:param name="GROUP_OUT"	data="output"/>
+		</ie:webject>
+			
+		<ie:success>
+			<ie:webject name="Commit-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="End-Session" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+		</ie:success>
+		<ie:failure>
+    		<ie:webject name="Rollback-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="End-Session" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="Throw-Exception" TYPE="MGT"/>
+		</ie:failure>
+	</ie:unit>

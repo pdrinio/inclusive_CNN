@@ -1,0 +1,180 @@
+<%@page language="java" import="com.infoengine.au.NamingService"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder,java.util.regex.*,java.util.*,java.util.regex.Pattern,java.lang.*"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.delegate.def
+@comment Servicio Web para crear Articulos
+@delegateName crearArticulo
+-->
+
+<!--com.infoengine.soap.rpc.def
+@param string id 			Id MANGO del articulo
+@param string nombre		Nombre del articulo
+@param string descripcion 	Descripcion del articulo
+@param string tipo 			Tipo del articulo
+@param string idGrupo 		Grupo del articulo
+@param string idFamilia 	Familia del articulo
+@param string largo			Largo del articulo
+@param string ancho			Ancho del articulo
+@param string alto			Alto del articulo
+@param string peso			Peso del articulo
+@param string pesoEmbalado	Peso embalado del articulo
+-->
+
+<%
+	String id = (String) getParam("id", "");
+	String nombre = (String) getParam("nombre", "");
+	String descripcion = (String) getParam("descripcion", "");
+	String tipo = (String) getParam("tipo", "A");
+	String grupo = (String) getParam("idGrupo", "0");
+	String familia = (String) getParam("idFamilia", "0");
+	String largo = (String) getParam("largo", null);
+	String ancho = (String) getParam("ancho", null);
+	String alto = (String) getParam("alto", null);
+	String peso = (String) getParam("peso", null);
+	String pesoEmbalado = (String) getParam("pesoEmbalado", null);
+	String nameSearch = nombre;
+	String listAtrs = "";
+	int endIndex;
+	
+	String result = "result=false";
+	Group grp;	
+	
+	if ((nombre != null) && (nombre.length() >= 0)) {	
+		endIndex = Math.min(nombre.length(), 60);
+		nombre = nombre.substring(0, endIndex);
+		nameSearch = nombre.replace("'", "?");
+	}
+	
+	if (tipo.toUpperCase().equals("S")) {
+		tipo = "Servicio";
+	} else {
+		tipo = "Articulo";
+	}
+		
+	if (largo != null) {
+		listAtrs = "Largo=" + largo.replace(".", ",") + ";";
+	}
+	if (ancho != null) {
+		listAtrs = listAtrs + "Ancho=" + ancho.replace(".", ",") + ";";
+	}
+	if (alto != null) {
+		listAtrs = listAtrs + "Alto=" + alto.replace(".", ",") + ";";
+	}
+	if (peso != null) {
+		listAtrs = listAtrs + "Peso=" + peso.replace(".", ",") + ";";
+	}
+	if (pesoEmbalado != null) {
+		listAtrs = listAtrs + "PesoEmbalado=" + pesoEmbalado.replace(".", ",") + ";";
+	}		
+%>
+	<ie:unit>
+  		<ie:init>
+			<ie:webject name="Start-Session" type="ACT">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[]}"/>
+				<ie:param name="GROUP_OUT" 		data="session"/>				
+			</ie:webject>
+
+			<ie:webject name="Start-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" 	data="${session[]session_id[0]}"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[]}"/>
+			</ie:webject>
+		</ie:init>
+
+<!-- Comprobamos que no existe un articulo con el mismo nombre o con el id de Mango	-->		
+		<ie:webject name="Search-Objects" type="OBJ"> 
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="INSTANCE"       data="<%= wtInstance %>"/>
+			<ie:param name="AUTHORIZATION"  data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+			<ie:param name="TYPE"			data="Articulo"/>
+			<ie:param name="WHERE"			data="(name='<%= nameSearch %>')|(Id='<%= id %>')"/>
+			<ie:param name="ATTRIBUTE"		data="obid"/>
+			<ie:param name="GROUP_OUT"      data="search"/>
+		</ie:webject>
+<%
+		grp = getGroup("search");
+		if (grp.getElementCount() == 0) {
+			if (nombre.length() < 1) {
+				System.out.println("*************************************************************************");
+				System.out.println("*************************************************************************");
+				System.out.println("*************************************************************************");
+				System.out.println("CREAR ARTICULO.");
+				System.out.println("ERROR: Atributo 'Nombre' vacio. Id Articulo = " + id);
+				System.out.println("*************************************************************************");
+				System.out.println("*************************************************************************");
+				System.out.println("*************************************************************************");
+			}
+			else {
+%>		
+				<ie:webject name="Query-Objects" type="OBJ"> 
+					<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+					<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+					<ie:param name="TYPE"            data="LibArticulos"/>
+					<ie:param name="WHERE"           data="()"/>				
+					<ie:param name="GROUP_OUT"       data="libArticulos"/>
+				</ie:webject>
+		
+				<ie:webject name="Create-Objects" type="ACT">
+					<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+					<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="SESSION_ID" 	data="${session[]session_id[0]}"/>
+					<ie:param name="TYPE" 			data="Articulo"/>
+					<ie:param name="CONTAINER_REF" 	data="${libArticulos[]obid[]}"/>
+					<ie:param name="FIELD" 			data="name=<%= nombre %>"/>
+					<ie:param name="FIELD" 			data="Id=<%= id %>"/>
+					<ie:param name="FIELD" 			data="Descripcion=<%= descripcion %>"/>
+					<ie:param name="FIELD" 			data="Tipo=<%= tipo %>"/>				
+					<ie:param name="FIELD" 			data="IdGrupo=<%= grupo %>"/>
+					<ie:param name="FIELD" 			data="IdFamilia=<%= familia %>"/>
+					<ie:param name="FIELD" 			data="<%= listAtrs %>" valueSeparator=";" delim=";" default=""/>
+					<ie:param name="GROUP_OUT" 		data="articulo"/>
+				</ie:webject>
+<%
+				grp = getGroup("articulo");
+				if (grp.getElementCount() > 0) {
+					//result = grp.getAttributeValue(0, "obid").toString();
+					//result = result.split(":")[2];
+					result = "result=true";
+				}
+			}
+		}
+%>		
+		<ie:webject name="Create-Group" type="GRP">
+			<ie:param name="ELEMENT"	data="<%= result %>"/>
+			<ie:param name="GROUP_OUT"	data="output"/>
+		</ie:webject>
+	
+		<ie:success>
+			<ie:webject name="Commit-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="End-Session" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+		</ie:success>
+		<ie:failure>
+    		<ie:webject name="Rollback-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="End-Session" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="Throw-Exception" TYPE="MGT"/>
+		</ie:failure>
+	</ie:unit>

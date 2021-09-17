@@ -1,0 +1,80 @@
+<%@page language="java" import="com.infoengine.au.NamingService, java.net.*, wt.util.*, wt.content.*, wt.fc.*"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.delegate.def
+@comment Tarea de búsqueda de objetos 
+-->
+
+<!--com.infoengine.soap.rpc.def
+@param string tipos			Los tipos de los objetos a buscar separados por ,
+@param string filtro		Filtro a aplicar en la búsqueda
+-->	
+
+<ie:unit>
+	<ie:init>
+		<ie:webject name="Start-Session" type="ACT">
+			<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="BLOB_COUNT" data="0" />
+			<ie:param name="GROUP_OUT" 	data="session"/>
+		</ie:webject>
+    
+		<ie:webject name="Start-Transaction" type="ACT">
+			<ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+	</ie:init>
+  
+	<ie:webject name="Create-Group" type="GRP">
+		<ie:param name="GROUP_OUT" 	data="results"/>
+		<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+	</ie:webject>  
+
+	<ie:webject name="Search-Objects" type="OBJ"> 
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="INSTANCE"        	data="${session[0]INSTANCE[0]}"/>
+		<ie:param name="AUTHORIZATION"   	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="VERSION"			data="LATEST" />
+		<ie:param name="TYPE"			 	data="${@FORM[]tipos[0]}" default="wt.fc.WTObject" delim="," />
+		<ie:param name="WHERE"				data="${@FORM[]filtro[0]}" default="()"/>
+		<ie:param name="ATTRIBUTE"		 	data="*" delim=","/>
+		<ie:param name="GROUP_OUT"       	data="search"/>
+	</ie:webject>
+	
+	<ie:success>
+		<ie:webject name="Commit-Transaction" type="ACT">
+			<ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+    
+		<ie:webject name="End-Session"	type="ACT">
+			<ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+	</ie:success>
+
+	<ie:failure>
+		<ie:webject name="Rollback-Transaction" type="ACT">
+			<ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+    
+		<ie:webject name="End-Session"	type="ACT">
+			<ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+
+		<ie:webject name="Throw-Exception" type="MGT" />
+	</ie:failure>
+	
+	<ie:webject name="Sort-Group" type="GRP">
+		<ie:param name="GROUP_IN"   data="search"/>
+		<ie:param name="SORTBY"	    data="name" delim=","/>
+		<ie:param name="GROUP_OUT"  data="output"/>
+	</ie:webject>
+
+</ie:unit>

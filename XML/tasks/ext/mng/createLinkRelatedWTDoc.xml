@@ -1,0 +1,68 @@
+<%@page language="java" session="false" import="com.infoengine.au.NamingService, java.lang.String"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.delegate.def
+@comment Crea una asociación entre dos objetos
+@delegateName createLinkRelatedWTDoc
+-->
+
+<!--com.infoengine.soap.rpc.def
+
+@param string idPart			Id del part principal
+@param string idDocumento		Id del documento que se desea asociar al Part
+-->
+
+<ie:unit>
+	<ie:init>
+		<ie:webject name="Start-Session" type="ACT">
+			<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="BLOB_COUNT" data="0" />
+			<ie:param name="GROUP_OUT" data="session"/>
+		</ie:webject>
+		<ie:webject name="Start-Transaction" type="ACT">
+			<ie:param name="INSTANCE" data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+	</ie:init>
+    
+	<ie:webject name="Create-Links" type="ACT">
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="INSTANCE" 	     	data="${session[0]INSTANCE[0]}"/>
+    	<ie:param name="SESSION_ID" 	    data="${session[0]SESSION_ID[0]}" />
+		<ie:param name="FROM_OBJECT_REF"  	data="${@FORM[]idPart[]}"/>	
+		<ie:param name="TO_OBJECT_REF"    	data="${@FORM[]idDocumento[]}"/>
+    	<ie:param name="TYPE" 	     		data="wt.part.WTPartDescribeLink"/>
+    	<ie:param name="GROUP_OUT" 	     	data="output"/>
+	</ie:webject>
+
+	<ie:success>
+		<ie:webject name="Commit-Transaction" type="ACT">
+			<ie:param name="INSTANCE" data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+		<ie:webject name="End-Session"	type="ACT">
+			<ie:param name="INSTANCE" data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+	</ie:success>
+
+	<ie:failure>
+		<ie:webject name="Rollback-Transaction" type="ACT">
+			<ie:param name="INSTANCE" data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+		<ie:webject name="End-Session"	type="ACT">
+			<ie:param name="INSTANCE" data="${session[0]INSTANCE[0]}"/>
+			<ie:param name="SESSION_ID" data="${session[0]SESSION_ID[0]}" />
+		</ie:webject>
+
+		<ie:webject name="Throw-Exception" type="MGT" />
+	</ie:failure>
+</ie:unit>
+

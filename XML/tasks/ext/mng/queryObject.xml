@@ -1,0 +1,231 @@
+<%@page language="java" import="com.infoengine.au.NamingService,wt.util.*,java.util.*,java.util.regex.Pattern"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string obid id del objeto que se quiere recuperar
+-->
+
+<ie:unit>
+<%
+if (Pattern.matches("(VR|vr|OR|or):.+WTUser:\\d+", (String)getParam("obid"))) {
+%>
+	<ie:webject name="Query-Objects" type="OBJ"> 
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="OBJECT_REF"		 data="${@FORM[]obid[0]}" delim=","/>
+		<ie:param name="ATTRIBUTE"		 data="obid,name,fullName" delim=","/>
+		<ie:param name="GROUP_OUT"       data="results"/>
+	</ie:webject>
+<%
+	Group results = null;
+%>
+	<ie:forEach groupIn="results" groupOut="elemento">
+<%
+		results = getGroup("elemento");
+		results.setAttributeValue(0,"originalName",results.getAttributeValue(0, "name"));
+		results.setAttributeValue(0,"name",results.getAttributeValue(0, "fullName"));
+%>
+	</ie:forEach>
+	<ie:webject name="Sort-Group" type="GRP">
+		<ie:param name="GROUP_IN"   data="results"/>
+		<ie:param name="SORTBY"	    data="obid" delim=","/>
+		<ie:param name="GROUP_OUT"  data="output"/>
+	</ie:webject>
+<%
+} else {
+%>
+	<ie:webject name="Query-Objects" type="OBJ"> 
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="OBJECT_REF"		 data="${@FORM[]obid[0]}" delim=","/>
+		<ie:param name="ATTRIBUTE"		 data="*" delim=","/>
+		<ie:param name="GROUP_OUT"       data="results"/>
+	</ie:webject>
+	
+	<ie:webject name="Expand-References" type="OBJ">
+		<ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+		<ie:param name="INSTANCE" 		 	data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="REFERENCE" 			data="obid" delim=","/>
+		<ie:param name="AUTHORIZATION" 		data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="GROUP_IN" 			data="results"/>
+		<ie:param name="GROUP_OUT" 			data="results"/>
+	</ie:webject>
+	
+
+<%
+	String MIN_DATE = "01/01/1900 00:00:00";
+	String MIN_DATE_EN = "1900-01-01 00:00:00";
+%>
+
+	<!-- Para cada elemento del grupo de resultados, obtendremos sus atributos -->
+	<ie:forEach groupIn="results" groupOut="elemento">
+		<!-- Obtenemos los atributos para el tipo del elemento en cuestion -->
+		<ie:webject name="Describe-Attributes" type="OBJ">
+			<ie:param name="INSTANCE"        			data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="ACCEPT_LANGUAGE" 			data="es-ES"/>
+			<ie:param name="AUTHORIZATION"   			data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+			<ie:param name="GROUP_OUT" 					data="attributes"/>
+			<ie:param name="TYPE"						data="${elemento[]obid.class[]}"/>
+			<ie:param name="INCLUDE_CONSTRAINTS" 		data="TRUE"/>
+			<ie:param name="INCLUDE_DESCRIPTORS" 		data="TRUE"/>
+			<ie:param name="INCLUDE_SOFT_ATTRIBUTES" 	data="TRUE"/>
+			<ie:param name="ATTRIBUTE"					data="name,displayName" delim=","/>
+		</ie:webject>
+	
+		<ie:webject name="Subset-Group" type="GRP">
+			<ie:param name="FILTER_TYPE" 	data="IE"/>
+			<ie:param name="FILTER_MODE" 	data="NOMATCH"/>
+			<ie:param name="GROUP_IN" 		data="attributes"/>
+			<ie:param name="FILTER" 		data="name='name'"/>
+			<ie:param name="GROUP_OUT" 		data="attributes"/>
+		</ie:webject>
+	
+		<ie:webject name="Sort-Group" type="GRP">
+			<ie:param name="GROUP_IN"   data="attributes"/>
+			<ie:param name="SORTBY"	    data="displayName" delim=","/>
+			<ie:param name="SORTED" 	data="ASC"/>
+			<ie:param name="COMPARISON" data="ALPHA"/>
+			<ie:param name="GROUP_OUT"  data="attributes"/>
+		</ie:webject>
+	
+		<!-- Creamos el grupo que contendrá los atributos del objeto -->
+		<ie:webject name="Create-Group" type="GRP">
+			<ie:param name="GROUP_OUT" 	data="atributosObjeto"/>
+			<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+		</ie:webject>
+<%
+		Group gAtt = getGroup("atributosObjeto");
+		Group elemento = getGroup("elemento");
+		Group refObj = null;
+		String dName = null;
+		String type = null;
+		Vector vectorValores;
+		List<Element> listValores;
+		String values;
+		String BASEUSER = "0=Usuario desconocido";
+		String user = null;
+		
+		// Comprobación para los documentos con usuario borrado
+		user = (String)getGroup("elemento").getAttributeValue(0, "iterationInfo.modifier");
+		
+		if ((user != null) && !(user.contains("="))) {
+			getGroup("elemento").setAttributeValue(0,"iterationInfo.modifier",BASEUSER);
+		}
+%>
+	
+		<ie:forEach groupIn="attributes" groupOut="atributo">
+<%
+			Group atributo = getGroup("atributo");
+			String fecha;
+			values = "";
+
+//	Esta comprobación se quita para permitir asignar valores a atributos creados después de la creación del objeto.
+//			if (elemento.getAttributeValue(0 , "obid." + atributo.getAttributeValue(0, "name")) != null) {
+				//El atributo esta presente, por tanto crearemos el elemento de salida
+				Element att = new Element("atributo");
+				
+				att.addAtt(new Att("name" , atributo.getAttributeValue(0, "name")));
+				
+				type = ((String)atributo.getAttributeValue(0, "type"));
+				type = type.substring(type.lastIndexOf(".")+1);
+				att.addAtt(new Att("type" , type));
+				
+				dName = (String)atributo.getAttributeValue(0, "displayName");
+				if (!dName.contains(":")) {
+					att.addAtt(new Att("displayName" , dName));
+					att.addAtt(new Att("orden" , "1000"));
+				} else {
+					att.addAtt(new Att("displayName" , dName.substring(dName.lastIndexOf(":")+1)));
+					att.addAtt(new Att("orden" , dName.substring(0,dName.lastIndexOf(":"))));
+				}
+				
+				if (!type.contains("FloatingPoint")) {
+					att.addAtt(new Att("defaultValue" , atributo.getAttributeValue(0, "defaultValue")));
+				} else {
+					att.addAtt(new Att("defaultValue" , "0"));
+				}
+				
+				if (!type.endsWith("Timestamp")) {
+					att.addAtt(new Att ("value", elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name"))));
+					
+					if ((!dName.startsWith("0:")) &&(elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name")) != null) && (Pattern.matches("(VR|vr|OR|or):.+WTUser:\\d+", (String)elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name"))))) {
+%>
+						<ie:webject name="Query-Objects" type="OBJ"> 
+							<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+							<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+							<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+							<ie:param name="OBJECT_REF"		 data="<%= elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name"))  %>"/>
+							<ie:param name="ATTRIBUTE"		 data="obid,name,fullName" delim=","/>
+							<ie:param name="GROUP_OUT"       data="referencedObject"/>
+						</ie:webject>
+<%
+						refObj = getGroup("referencedObject");
+						
+						if ((refObj != null) && (refObj.getAttributeValue(0, "fullName") != null)) {
+							att.addAtt(new Att ("displayValue", refObj.getAttributeValue(0, "fullName")));
+						}
+					}
+					else if ((!dName.startsWith("0:")) &&(elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name")) != null) && (Pattern.matches("(VR|vr|OR|or):.+:\\d+", (String)elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name"))))) {
+%>
+						<ie:webject name="Query-Objects" type="OBJ"> 
+							<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+							<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+							<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+							<ie:param name="OBJECT_REF"		 data="<%= elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name"))  %>"/>
+							<ie:param name="ATTRIBUTE"		 data="obid,name" delim=","/>
+							<ie:param name="GROUP_OUT"       data="referencedObject"/>
+						</ie:webject>
+<%
+						refObj = getGroup("referencedObject");
+						
+						if ((refObj != null) && (refObj.getAttributeValue(0, "name") != null)) {
+							att.addAtt(new Att ("displayValue", refObj.getAttributeValue(0, "name")));
+						}
+					}
+				} else {
+					fecha = (String)elemento.getAttributeValue(0, "obid." + atributo.getAttributeValue(0, "name"));
+					if ((fecha.contains(MIN_DATE)) | (fecha.contains(MIN_DATE_EN))) {
+						att.addAtt(new Att ("value", ""));
+					} else {
+						att.addAtt(new Att ("value", fecha));
+					}
+				}
+
+				listValores = atributo.getElementList();				
+				for (Element atr : listValores) {
+					vectorValores = atr.getValues("value");
+					if (!vectorValores.isEmpty()) {
+						values = vectorValores.toString();
+					}				
+				}				
+				att.addAtt(new Att("listValues", values));
+				
+				gAtt.addElement(att);
+//			}
+%>
+	</ie:forEach>
+	
+<%
+		if (gAtt.getElementCount() > 0) {
+			elemento.setAttributeValue(0 , "atributosObjeto" , gAtt);
+		}
+%>
+	</ie:forEach>
+	
+	<ie:webject name="Sort-Group" type="GRP">
+		<ie:param name="GROUP_IN"   data="results"/>
+		<ie:param name="SORTBY"	    data="obid" delim=","/>
+		<ie:param name="GROUP_OUT"  data="output"/>
+	</ie:webject>
+	
+<%
+}
+%>
+</ie:unit>

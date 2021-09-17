@@ -1,0 +1,150 @@
+<%@page language="java" session="false" import="com.infoengine.au.NamingService,wt.util.*,java.util.regex.*,java.util.*,java.lang.*,java.text.NumberFormat"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.delegate.def
+@comment Crea una asociación entre dos parts
+@delegateName createLink
+-->
+
+<!--com.infoengine.soap.rpc.def
+
+@param string oidpadre			El oid del part principal
+@param string listids			Lista con los ids de los part a asociar
+@param string enlace			Tipo del enlace a crear
+@param string listcantidades	Lista con las unidades de cada part
+@param string listunidades		Lista de unidades de cada part
+@param string listfilas			Lista con el numero de fila de cada part
+@param string attsLink			Lista de atributos que se guardaran en el enlace. Estos atributos deben existir en el tipo de la relación
+-->
+
+<!--
+http://pdmmango.loirainter.com/Windchill/servlet/IE/tasks/ext/mng/createLink.xml?oidPadre=VR:wt.part.WTPart:24762&listids=VR:wt.part.WTPart:22210;&enlace=ArticuloProveedor&listcantidades=1;&listunidades=1;&listfilas=1;&attsLink=Precio=45,78
+-->
+
+<ie:unit>
+
+  <ie:init>
+
+    <ie:webject name="Start-Session" type="ACT">
+      <ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+      <ie:param name="BLOB_COUNT" 	data="0" />
+      <ie:param name="GROUP_OUT" 	data="session"/>
+    </ie:webject>
+    <ie:webject name="Start-Transaction" type="ACT">
+      <ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+      <ie:param name="SESSION_ID" 	data="${session[0]SESSION_ID[0]}" />
+    </ie:webject>
+  </ie:init>
+
+<%
+  String [] listaIds = ((String) getParam("listids", null)).split(";");
+  String [] listaCant = ((String) getParam("listcantidades", null)).split(";");
+  String [] listaUds = ((String) getParam("listunidades", null)).split(";");
+  String [] listaFilas = ((String) getParam("listfilas", null)).split(";");
+  String [] listaAttsLink = ((String) getParam("attsLink", null)).split(";");
+    
+  int i = 0;
+  String idPart = "";
+  String cantidad = "";
+  String unidad = "";
+  String fila = "";
+  String attLink = "";
+    
+  while(i<listaIds.length)
+  {      
+      idPart = listaIds[i];
+      cantidad = listaCant[i];
+	  unidad = listaUds[i];
+	  fila = listaFilas[i];
+
+	  if (unidad.toLowerCase().compareTo("ud") == 0) {
+		unidad = "ea";
+	  }
+	  
+	  if ((listaAttsLink != null) && (listaAttsLink.length > i)) {
+		attLink = listaAttsLink[i];
+	  } else {
+		attLink = null;
+	  }
+	  
+      i++;      
+      if ((idPart.length() > 0) && (cantidad.length() > 0))
+      {
+%>
+
+    <ie:webject name="Query-Master" type="OBJ">
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+        <ie:param name="INSTANCE"	data="<%= wtInstance %>" default="Windchill"/>        
+        <ie:param name="OBJECT_REF" data="<%=idPart%>"/>
+        <ie:param name="GROUP_OUT"	data="master"/>
+    </ie:webject>
+		
+	<ie:webject name="Query-Objects" type="OBJ">
+        <ie:param name="INSTANCE"	data="<%= wtInstance %>" default="Windchill"/>        
+        <ie:param name="OBJECT_REF" data="${@FORM[]oidpadre[]}"/>
+		<ie:param name="ATTRIBUTE"	data="class"/>
+        <ie:param name="GROUP_OUT"	data="padre"/>
+    </ie:webject>	
+<%
+        Group parts = getGroup("master");
+		Group padre = getGroup("padre");
+		String clase = (String) padre.getAttributeValue(0, "class");		
+    
+        if (parts.getElementCount () > 0)
+        {	
+%>
+	<ie:webject name="Create-Object" type="ACT">
+		<ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+		<ie:param name="INSTANCE" 			data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="SESSION_ID" 		data="${session[]session_id[0]}"/>
+		<ie:param name="TYPE" 				data="${@FORM[]enlace[]}"/>
+		<ie:param name="FIELD"  			data="usedBy=${@FORM[]oidpadre[]}"/>
+		<ie:param name="FIELD"    			data="uses=${master[0]obid[]}"/>
+		<ie:param name="FIELD"	     		data="quantity.amount=<%=cantidad%>"/>
+		<ie:param name="FIELD"		 		data="quantity.unit=<%=unidad%>"/>
+		<ie:param name="FIELD"		 		data="lineNumber.value=<%=fila%>"/>
+		<%
+			if (attLink != null) {
+		%>
+		<ie:param name="FIELD" 				data="<%=attLink%>" valueSeparator="!" delim="!" default=""/>
+		<%
+			}
+		%>
+		<ie:param name="GROUP_OUT" 	     	data="links"/>
+	</ie:webject>
+<%
+        }
+    }
+} 
+%>
+  <ie:success>
+    <ie:webject name="Commit-Transaction" type="ACT">
+      <ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+      <ie:param name="SESSION_ID" 	data="${session[0]SESSION_ID[0]}" />
+    </ie:webject>
+    <ie:webject name="End-Session"	type="ACT">
+      <ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+      <ie:param name="SESSION_ID" 	data="${session[0]SESSION_ID[0]}" />
+    </ie:webject>
+  </ie:success>
+
+  <ie:failure>
+    <ie:webject name="Rollback-Transaction" type="ACT">
+      <ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+      <ie:param name="SESSION_ID" 	data="${session[0]SESSION_ID[0]}" />
+    </ie:webject>
+    <ie:webject name="End-Session"	type="ACT">
+      <ie:param name="INSTANCE" 	data="${session[0]INSTANCE[0]}"/>
+      <ie:param name="SESSION_ID" 	data="${session[0]SESSION_ID[0]}" />
+    </ie:webject>
+
+    <ie:webject name="Throw-Exception" type="MGT" />
+  </ie:failure>
+
+</ie:unit>

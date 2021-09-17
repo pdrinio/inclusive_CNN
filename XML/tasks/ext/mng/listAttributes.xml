@@ -1,0 +1,38 @@
+<%@page language="java" import="com.infoengine.au.NamingService,wt.util.*"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string objectId id del objeto del que se desea obtener los atributos
+-->
+
+<ie:unit>
+<ie:webject name="Query-Objects" type="OBJ"> 
+	<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+	<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+	<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+	<ie:param name="OBJECT_REF"	 data="${@FORM[]objectId[0]}"/>
+	<ie:param name="PURGE_DEFAULT"	 data="TRUE"/>
+	<ie:param name="GROUP_OUT"       data="object"/>
+</ie:webject>
+	
+<ie:webject name="Expand-References" type="OBJ">
+	<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+    <ie:param name="INSTANCE"      data="<%= wtInstance %>" default="Windchill"/>
+    <ie:param name="REFERENCE"     data="obid"/>
+    <ie:param name="AUTHORIZATION" data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+    <ie:param name="GROUP_IN" 	   data="object"/>
+    <ie:param name="GROUP_OUT"     data="result"/>
+</ie:webject>
+  
+<ie:webject name="Sort-Group" type="GRP">
+    <ie:param name="GROUP_IN"   data="result"/>
+    <ie:param name="SORTBY"	data="name" delim=","/>
+    <ie:param name="GROUP_OUT"  data="output"/>
+</ie:webject>
+
+</ie:unit>

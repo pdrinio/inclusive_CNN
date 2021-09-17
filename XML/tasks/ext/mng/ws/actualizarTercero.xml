@@ -1,0 +1,169 @@
+<%@page language="java" import="com.infoengine.au.NamingService"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder,java.util.regex.*,java.util.*,java.util.regex.Pattern,java.lang.*"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.delegate.def
+@comment Servicio Web para la actualización de terceros
+@delegateName actualizarTercero
+-->
+
+<!--com.infoengine.soap.rpc.def
+@param string id 			Id MANGO
+@param string nombre		Nombre del tercero
+@param string descripcion	Descripción del tercero
+@param string direccion 	Dirección del tercero
+@param string pais 			País del tercero
+@param string ciudad 		Ciudad del tercero
+@param string mail 			Mail del tercero
+@param string telefono 		Teléfono del tercero
+-->
+
+<%
+	String nombre = (String) getParam("nombre", null);
+	String descripcion = (String) getParam("descripcion", null);
+	String direccion = (String) getParam("direccion", null);
+	String pais = (String) getParam("pais", null);
+	String ciudad = (String) getParam("ciudad", null);
+	String mail = (String) getParam("mail", null);
+	String tfno = (String) getParam("telefono", null);
+	int endIndex;
+	
+	Group grp;
+	String listAtrs = "";
+	String result = "result=false";
+	
+	if ((nombre != null) && (nombre.length() >= 0)) {
+		endIndex = Math.min(nombre.length(), 60);
+		nombre = nombre.substring(0, endIndex);
+	}
+	
+	System.out.println("****************************************************************");
+	System.out.println("****************************************************************");
+	System.out.println("****************************************************************");
+	System.out.println("Nombre = " + nombre);
+	System.out.println("****************************************************************");
+	System.out.println("****************************************************************");
+	System.out.println("****************************************************************");
+	
+	if (descripcion != null) {
+		listAtrs = "Descripcion=" + descripcion + ";";
+	}
+	if (direccion != null) {
+		listAtrs = listAtrs + "Direccion=" + direccion + ";";
+	}
+	if (pais != null) {
+		listAtrs = listAtrs + "Pais=" + pais + ";";
+	}
+	if (ciudad != null) {
+		listAtrs = listAtrs + "Ciudad=" + ciudad + ";";
+	}
+	if (mail != null) {
+		listAtrs = listAtrs + "Email=" + mail + ";";
+	}
+	if (tfno != null) {
+		listAtrs = listAtrs + "Telefono=" + tfno + ";";
+	}	
+%>
+	<ie:unit>
+  		<ie:init>
+			<ie:webject name="Start-Session" type="ACT">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[]}"/>
+				<ie:param name="GROUP_OUT" 		data="session"/>				
+			</ie:webject>
+
+			<ie:webject name="Start-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" 	data="${session[]session_id[0]}"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[]}"/>
+			</ie:webject>
+		</ie:init>
+		
+		<ie:webject name="Search-Objects" type="OBJ"> 
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="INSTANCE"       data="<%= wtInstance %>"/>
+			<ie:param name="AUTHORIZATION"  data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+			<ie:param name="TYPE"			data="Tercero"/>
+			<ie:param name="WHERE"			data="(Id='${@FORM[]id[]}')"/>
+			<ie:param name="ATTRIBUTE"		data="obid"/>
+			<ie:param name="GROUP_OUT"      data="search"/>
+		</ie:webject>
+<%
+		grp = getGroup("search");
+		if (grp.getElementCount() > 0) {
+			if ((nombre != null) && (nombre.length() > 0)) {
+%>
+				<ie:webject name="Change-Identity" type="ACT">
+					<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+					<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[0]}"/>
+					<ie:param name="OBJECT_REF" 	data="${search[]obid[]}"/>    
+					<ie:param name="FIELD" 			data="name=<%= nombre %>"/>			
+				</ie:webject>
+<%
+			}
+			if (listAtrs.length() > 0) {
+%>				
+				<ie:webject name="Checkout-Objects" type="ACT">
+					<ie:param name="ACCEPT_LANGUAGE"	data="es-ES"/>
+					<ie:param name="INSTANCE" 			data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="OBJECT_REF" 		data="${search[]obid[]}"/>
+					<ie:param name="GROUP_OUT" 			data="checkout"/>
+				</ie:webject>
+
+				<ie:webject name="Update-Objects" type="ACT">
+					<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+					<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="AUTHORIZATION"	data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+					<ie:param name="OBJECT_REF" 	data="${checkout[]obid[]}"/>
+					<ie:param name="FIELD" 			data="<%= listAtrs %>" valueSeparator=";" delim=";"/>
+					<ie:param name="MODIFICATION" 	data="REPLACE"/>				
+				</ie:webject>
+		  
+				<ie:webject name="Checkin-Objects" type="ACT">
+					<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+					<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="OBJECT_REF" 	data="${search[]obid[]}"/>
+					<ie:param name="GROUP_OUT" 		data="checkin"/>
+				</ie:webject>
+<%		
+			}
+			result = "result=true";
+		}
+%>			
+		<ie:webject name="Create-Group" type="GRP">
+			<ie:param name="ELEMENT"	data="<%= result %>"/>
+			<ie:param name="GROUP_OUT"	data="output"/>
+		</ie:webject>
+			
+		<ie:success>
+			<ie:webject name="Commit-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="End-Session" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+		</ie:success>
+		<ie:failure>
+    		<ie:webject name="Rollback-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="End-Session" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="Throw-Exception" TYPE="MGT"/>
+		</ie:failure>
+	</ie:unit>

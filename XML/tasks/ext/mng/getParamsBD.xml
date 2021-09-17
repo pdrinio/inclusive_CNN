@@ -1,0 +1,39 @@
+<?xml version="1.0" standalone="yes"?>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="java.util.Enumeration,java.io.File,wt.util.*"%>
+<%@page import="wt.httpgw.WTURLEncoder"%>
+
+<!--com.infoengine.soap.rpc.def
+Devuelve la cadena de conexion a la BBDD pdm
+-->
+
+	<ie:webject name="Create-Group" type="GRP">
+		<ie:param name="GROUP_OUT" 	data="CadenaBD"/>
+		<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+	</ie:webject>
+<%
+	String cadena = "";
+	Group grpCadena = getGroup("CadenaBD");
+	
+	try {
+		WTProperties wtprops = WTProperties.getLocalProperties();
+
+		String server = wtprops.getProperty("ext.mng.pdm.db.server");
+		String instance = wtprops.getProperty("ext.mng.pdm.db.instance");
+		String database = wtprops.getProperty("ext.mng.pdm.db.database");
+		String user = wtprops.getProperty("ext.mng.pdm.db.user");
+		String password = wtprops.getProperty("ext.mng.pdm.db.pwd");
+		  
+		if ((server != null) && (database != null) && (user != null) && (password != null)) {			
+			if (instance != null) {
+				server = server + "\\" + instance;
+			}
+			cadena = "Data Source=" + server + ";Initial Catalog=" + database + ";User ID=" + user + ";Password=" + password;
+		}
+	}
+	catch (Exception ex) {
+		ex.printStackTrace();
+	}
+
+	grpCadena.setAttributeValue(0, "CadenaConexion", cadena);
+%>

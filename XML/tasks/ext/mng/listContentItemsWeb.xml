@@ -1,0 +1,71 @@
+<%@page language="java" import="com.infoengine.au.NamingService"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder,java.util.regex.*,java.util.*,wt.part.*,wt.fc.*,wt.vc.*,wt.content.*,wt.adapter.BasicWebjectDelegate,java.lang.*,java.net.*"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.delegate.def
+@comment Tarea que devuelve los objetos asociados al objeto que se pasa como parametro.
+@delegateName tmp
+-->
+
+<!--com.infoengine.soap.rpc.def
+@param string oid
+-->
+<%
+ReferenceFactory rfo = new ReferenceFactory();
+Persistable po1;
+ContentHolder ch1;
+ContentItem content1;
+ApplicationData appData1;
+
+URL downloadURL = null;
+try 
+{
+	po1 = rfo.getReference((String)getParam("oid")).getObject();
+	ch1 = (ContentHolder) po1;
+	ch1 = ContentHelper.service.getContents(ch1);
+	content1 = ContentHelper.getPrimary((FormatContentHolder) ch1);
+	if (content1 != null) {
+		appData1 = (ApplicationData) content1;
+		
+		if (appData1 != null) {
+			downloadURL = ContentHelper.getDownloadURL(ch1 , appData1,false,(String)null,true);
+		} else {
+			downloadURL = null;
+		}
+	} else {
+		downloadURL = null;
+	}
+} 
+catch (Exception ex) 
+{
+	downloadURL = null;
+}
+%>
+<!-- Creamos el grupo que contendrá los atributos del objeto -->
+<ie:webject name="Create-Group" type="GRP">
+	<ie:param name="GROUP_OUT" 	data="urls"/>
+	<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+</ie:webject>
+
+<%
+	Group gAtt = getGroup("urls");
+	Element att = new Element("url");
+	if (downloadURL != null) {
+		att.addAtt(new Att("downloadURL" , downloadURL.toString()));
+	} else {
+		att.addAtt(new Att("downloadURL" , ""));
+	}
+	
+	gAtt.addElement(att);
+%>
+
+<ie:webject name="Sort-Group" type="GRP">
+	<ie:param name="GROUP_IN"   data="urls"/>
+	<ie:param name="SORTBY"	    data="downloadUrl" delim=","/>
+	<ie:param name="GROUP_OUT"  data="output"/>
+</ie:webject>

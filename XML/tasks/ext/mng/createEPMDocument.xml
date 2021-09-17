@@ -1,0 +1,96 @@
+<?xml version="1.0" standalone="yes"?>
+<%@page language="java" session="false"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder"%>
+<%@page import="com.ptc.windchill.ws.ContentHandle"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string type 			Clase del documento
+@param string name 			Nombre del documento
+@param string application 	Aplicación que creó el documento
+@param string library 		Contenedor del documento
+@param string folder 		Carpeta donde se crea el documento
+@param string atributos 	Lista de pares atributo=valor separados por ;
+@param string description 	Descripción del documento
+-->
+
+	<ie:unit>
+  		<ie:init>
+			<ie:webject name="Start-Session" type="ACT">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[]}"/>
+				<ie:param name="GROUP_OUT" 		data="session"/>				
+			</ie:webject>
+
+			<ie:webject name="Start-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" 	data="${session[]session_id[0]}"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[]}"/>
+			</ie:webject>
+		</ie:init>
+		
+	<%
+		// Renombramos CADName para evitar duplicados
+		String cadName = (String)getParam("name", "");		
+		int pos;
+		java.util.Date utilDate = new java.util.Date();
+		long ms = utilDate.getTime();
+
+		pos = cadName.toLowerCase().lastIndexOf(".dwg");
+		if (pos > 0) {
+			cadName = cadName.substring(0,pos) + "_" + Long.toString(ms) + ".dwg";
+		}
+		else {
+			cadName = cadName + "_" + Long.toString(ms);
+		}
+	%>		
+
+		<ie:webject name="Create-Object" type="ACT">
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="SESSION_ID" 	data="${session[]session_id[0]}" />
+			<ie:param name="TYPE" 			data="${@FORM[]type[]}" />
+			<ie:param name="CONTAINER_REF" 	data="${@FORM[]library[]}" />
+			<ie:param name="FIELD" 			data="name=${@FORM[]name[]}" />
+			<ie:param name="FIELD" 			data="CADName=<%= cadName %>" />
+			<ie:param name="FIELD" 			data="authoringApplication=${@FORM[]application[]}" />
+			<ie:param name="FIELD" 			data="docType=CADCOMPONENT" />
+			<ie:param name="FIELD" 			data="ownerApplication=EPM" />
+			<ie:param name="FIELD" 			data="folder.id=${@FORM[]folder[]}" />
+			<ie:param name="FIELD" 			data="${@FORM[]atributos[]}" valueSeparator=";" delim=";" />
+			<ie:param name="FIELD" 			data="description=${@FORM[]description[]} "/>
+			<ie:param name="GROUP_OUT" 		data="output"/>
+		</ie:webject>
+
+		<ie:success>
+			<ie:webject name="Commit-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="End-Session" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+		</ie:success>
+		<ie:failure>
+    			<ie:webject name="Rollback-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="End-Session" type="ACT">
+				<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="Throw-Exception" TYPE="MGT"/>
+		</ie:failure>
+	</ie:unit>

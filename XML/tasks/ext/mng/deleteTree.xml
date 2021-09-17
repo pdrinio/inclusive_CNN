@@ -1,0 +1,106 @@
+<%@page import="wt.util.*,java.util.*,java.util.regex.*"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+Borra el despiece de los articulos de tipo tercero
+-->
+
+<%	
+	String serverPrefix = wtInstance.substring(0,wtInstance.lastIndexOf("."));
+	String name, version, idLink;
+	Enumeration atributos = null;
+	Att atributo = null;
+	Boolean hecho;
+	
+	serverPrefix = serverPrefix.substring(0,serverPrefix.lastIndexOf("."));	
+%>
+<ie:webject name="Search-Objects" type="OBJ"> 
+	<ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+	<ie:param name="INSTANCE"        	data="<%= wtInstance %>"/>	
+	<ie:param name="VERSION"			data="LATEST" />
+	<ie:param name="TYPE"			 	data="Tercero"/>
+	<ie:param name="WHERE"				data="()"/>
+	<ie:param name="ATTRIBUTE"		 	data="obid,name,iterationInfo.identifier.iterationId" delim=","/>
+	<ie:param name="PAGE_COUNT"			data="500" />
+	<ie:param name="SORTBY"				data="thePersistInfo.modifyStamp" />
+	<ie:param name="SORTED"				data="DESC" />
+	<ie:param name="GROUP_OUT"       	data="search"/>	
+</ie:webject>
+
+<ie:forEach groupIn="search" groupOut="tercero">
+<%
+	version = getGroup("tercero").getAttributeValue(0, "iterationInfo.identifier.iterationId").toString();
+	if (!version.equals("1")) {
+		name = getGroup("tercero").getAttributeValue(0, "name").toString();
+		
+		System.out.println("*****************************************************************************");
+		System.out.println("*****************************************************************************");
+		System.out.println("BORRANDO ARTICULOS DE '" + name + "'");
+		System.out.println("*****************************************************************************");
+		System.out.println("*****************************************************************************");	
+%>
+		<ie:webject name="Checkout-Objects" type="ACT">
+			<ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+			<ie:param name="INSTANCE" 			data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="OBJECT_REF" 		data="${tercero[]obid[]}"/>			
+			<ie:param name="GROUP_OUT" 			data="extraido"/>
+		</ie:webject>	
+	
+		<ie:webject name="Query-Tree" type="OBJ">
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="OBJECT_REF" 	data="${extraido[]obid[]}"/>
+			<ie:param name="DIRECTION" 		data="uses"/>
+			<ie:param name="TYPE" 			data="wt.part.WTPartUsageLink"/>	  
+			<ie:param name="DEPTH" 			data="1"/>
+			<ie:param name="OUTPUT_TYPE"	data="FULL"/>
+			<ie:param name="AUTO_NAVIGATE" 	data="TRUE"/>
+			<ie:param name="SELECTBY" 		data="LATEST"/>
+			<ie:param name="ATTRIBUTE" 		data="*"/>
+			<ie:param name="GROUP_OUT" 		data="arbol"/>
+		</ie:webject>
+		
+		<ie:forEach groupIn="arbol" groupOut="articulo">
+<%
+			hecho = false;
+			idLink = null;
+			for (Element elemento:getGroup("articulo").getElementList()) {		
+				atributos = elemento.getAtts();				
+			
+				while (atributos.hasMoreElements() & !hecho) {
+					atributo = (Att)atributos.nextElement();
+					if (atributo.getName().contains("WCTYPE|wt.part.WTPartUsageLink|" + serverPrefix + ".ArticuloProveedor.obid")) {
+						idLink = atributo.getValue().toString();						
+						hecho = true;
+					}
+				}
+			}
+		
+			if (hecho) {
+%>
+				<ie:webject name="Delete-Objects" type="ACT">
+					<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+					<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="OBJECT_REF"   	data="<%= idLink %>" />
+					<ie:param name="GROUP_OUT" 		data="borrado"/>
+				</ie:webject>
+<%
+			}
+%>			
+		</ie:forEach>
+		
+		<ie:webject name="Checkin-Objects" type="ACT">
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="instance" 		data="<%= wtInstance %>" default="Windchill"/>
+			<ie:param name="object_ref" 	data="${tercero[]obid[]}" />			
+			<ie:param name="group_out" 		data="archivado"/>
+		</ie:webject>
+<%
+	}
+%>	
+</ie:forEach>

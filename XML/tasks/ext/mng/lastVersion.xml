@@ -1,0 +1,107 @@
+<%@page language="java" import="com.infoengine.au.NamingService,wt.util.*"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string oids id del objeto del que se desea obtener la última revisión de la última iteración
+@param string applyFilter Aplica el filtro de objeto en estado "Publicado"
+-->
+
+<ie:webject name="Create-Group" type="GRP">
+	<ie:param name="GROUP_OUT" data="results"/>
+	<ie:param name="CLASS" data="wt.fc.WTObject"/>
+</ie:webject>
+<%
+	String oids[] = ((String)getParam("oids" , "")).split(",");
+	int applyFilter = Integer.valueOf((String)getParam("applyFilter", "1"));
+	
+	for (String oid : oids) {
+		try {
+%>
+	<ie:webject name="Create-Group" type="GRP">
+		<ie:param name="GROUP_OUT" data="tmp"/>
+		<ie:param name="CLASS" data="wt.fc.WTObject"/>
+	</ie:webject>
+	<ie:webject name="Iteration-History" type="OBJ">
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="INSTANCE"        			data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="AUTHORIZATION"   			data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<!-- <ie:param name="ATTRIBUTE" 					data="obid,checkoutInfo.state" valueSeparator="," delim=","/>  -->
+		<ie:param name="OBJECT_REF" 				data="<%= oid%>"/>
+		<ie:param name="GROUP_OUT" 					data="items"/>
+	</ie:webject>
+	<ie:webject name="Expand-References" type="OBJ">
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="INSTANCE" 					data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="REFERENCE" 					data="obid"/>
+		<ie:param name="AUTHORIZATION" 				data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<!-- <ie:param name="ATTRIBUTE" 					data="obid,obid.versionInfo.identifier.versionId,obid.iterationInfo.identifier.iterationId,obid.iterationInfo.latest,obid.state.state,obid.containerReference,checkoutInfo.state" valueSeparator="," delim=","/> -->
+		<ie:param name="GROUP_IN" 					data="items"/>
+		<ie:param name="GROUP_OUT" 					data="items"/>
+	</ie:webject>
+	
+	<ie:webject name="Subset-Group" type="GRP">
+		<ie:param name="FILTER_TYPE" 				data="IE"/>
+		<ie:param name="FILTER_MODE" 				data="NOMATCH"/>
+		<ie:param name="GROUP_IN" 					data="items"/>
+		<ie:param name="FILTER" 					data="checkoutInfo.state='wrk'"/>
+		<ie:param name="GROUP_OUT" 					data="items"/>
+	</ie:webject>
+	
+	<%
+		if (applyFilter == 1) {
+	%>
+	<ie:webject name="Subset-Group" type="GRP">
+		<ie:param name="FILTER_TYPE" 				data="IE"/>
+		<ie:param name="FILTER_MODE" 				data="NOMATCH"/>
+		<ie:param name="GROUP_IN" 					data="items"/>
+		<ie:param name="FILTER" 					data="obid.state.state='INWORK'"/>
+		<ie:param name="GROUP_OUT" 					data="items"/>
+	</ie:webject>
+	<%
+		}
+	%>
+	<ie:webject name="Sort-Group" type="GRP">
+		<ie:param name="GROUP_IN" 					data="items"/>
+		<ie:param name="SORTBY" 					data="obid.versionInfo.identifier.versionId,obid.iterationInfo.identifier.iterationId" delim=","/>
+		<ie:param name="SORTED" 					data="DESC,DESC" delim=","/>
+		<ie:param name="COMPARISON" 				data="NUMERIC,NUMERIC" delim=","/>
+		<!--<ie:param name="CASE_IGNORE" 				data="TRUE,TRUE" delim=","/>-->
+		<ie:param name="GROUP_OUT" 					data="items"/>
+	</ie:webject>
+	<%
+			Group grp = getGroup("items");
+			Group tmp = getGroup("tmp");
+		
+			Element item = grp.getElementAt(0);
+			
+			String goid = (String)item.getValue("obid");
+			if (!goid.toLowerCase().contains(oid.toLowerCase()) && !oid.toLowerCase().contains(goid.toLowerCase())) {
+				item.addAtt(new Att("originalOid", oid));
+		
+				tmp.addElement(item);
+	%>
+	<!-- Por ultimo concatenamos los elementos al grupo de salida -->
+	<ie:webject name="Concat-Groups" type="GRP">
+	  <ie:param name="CLASS" 			data="wt.fc.WTObject"/>
+	  <ie:param name="GROUP_IN" 		data="tmp"/>
+	  <ie:param name="GROUP_IN" 		data="results"/>
+	  <ie:param name="GROUP_OUT" 		data="results"/>
+	</ie:webject>
+	
+<%
+			}
+		} catch (Exception e) {
+		}
+	}
+%>
+
+<ie:webject name="Sort-Group" type="GRP">
+    <ie:param name="GROUP_IN"   data="results"/>
+    <ie:param name="SORTBY"	    data="obid" delim=","/>
+    <ie:param name="GROUP_OUT"  data="output"/>
+</ie:webject>

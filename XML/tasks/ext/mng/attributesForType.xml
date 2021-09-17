@@ -1,0 +1,91 @@
+<%@page language="java" import="com.infoengine.au.NamingService,wt.util.*,java.util.*"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string type tipo de Windchill del que se desean obtener los soft attributes definidos
+-->
+
+<ie:unit>
+	<ie:webject name="Describe-Attributes" type="OBJ">
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="INSTANCE"        				data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="AUTHORIZATION"   				data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="GROUP_OUT" 						data="attributes"/>
+		<ie:param name="TYPE"							data="${@FORM[]type[0]}"/>
+		<ie:param name="INCLUDE_CONSTRAINTS" 			data="TRUE"/>
+		<ie:param name="INCLUDE_DESCRIPTORS" 			data="TRUE"/>
+		<ie:param name="INCLUDE_SOFT_ATTRIBUTES" 		data="TRUE"/>
+		<ie:param name="ATTRIBUTE"						data="name,displayName" delim=","/>
+	</ie:webject>
+	
+	<ie:webject name="Subset-Group" type="GRP">
+		<ie:param name="FILTER_TYPE"	data="IE"/>
+		<ie:param name="FILTER_MODE"	data="NOMATCH"/>
+		<ie:param name="GROUP_IN" 		data="attributes"/>
+		<ie:param name="FILTER" 		data="name='name'"/>
+		<ie:param name="GROUP_OUT" 		data="atrs"/>		
+	</ie:webject>
+
+<%
+	String dName = null;
+	String type = null;
+	Vector vectorValores;
+	List<Element> listValores;
+	String values;
+%>
+
+	<ie:forEach groupIn="atrs" groupOut="atributo">
+		<%
+			Group atributo = getGroup("atributo");
+			values = "";
+			Element orden = new Element("orden");
+				
+				type = ((String)atributo.getAttributeValue(0, "type"));
+				type = type.substring(type.lastIndexOf(".")+1);
+				atributo.setAttributeValue(0,"type",type);
+				
+				dName = (String)atributo.getAttributeValue(0, "displayName");
+				if (!dName.contains(":")) {
+					atributo.setAttributeValue(0,"displayName",dName);
+					atributo.setAttributeValue(0,"orden","1000");
+				} else {
+					atributo.setAttributeValue(0,"displayName",dName.substring(dName.lastIndexOf(":")+1));
+					atributo.setAttributeValue(0,"orden",dName.substring(0,dName.lastIndexOf(":")));
+					//atributo.addAtt(new Att("orden" , dName.substring(0,dName.lastIndexOf(":"))));
+				}
+				
+				if (type.contains("FloatingPoint")) {
+					atributo.setAttributeValue(0,"defaultValue","0");
+				} 
+
+				if (type.endsWith("Timestamp")) {
+					atributo.setAttributeValue(0,"defaultValue","01/01/1900");
+				}
+				
+				listValores = atributo.getElementList();
+				for (Element atr : listValores) {
+					vectorValores = atr.getValues("value");
+					if (!vectorValores.isEmpty()) {
+						values = vectorValores.toString();
+					}				
+				}
+				atributo.setAttributeValue(0,"listValues",values);
+				//atributo.addAtt(new Att("listValues", values));				
+				
+				//gAtt.addElement(att);			
+		%>
+	</ie:forEach>	
+	
+	<ie:webject name="Sort-Group" type ="GRP">
+		<ie:param name="SORTBY" 	data="orden"/>
+		<ie:param name="GROUP_IN" 	data="atrs"/>
+		<ie:param name="COMPARISON" data="NUMERIC"/>
+		<ie:param name="GROUP_OUT" 	data="output"/>
+	</ie:webject>
+	
+</ie:unit>

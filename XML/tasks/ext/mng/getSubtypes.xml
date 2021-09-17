@@ -1,0 +1,54 @@
+<%@page language="java" import="com.infoengine.au.NamingService,wt.util.*"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string tipo  Tipo padre del que queremos recuperar los subtipos
+-->
+
+<!--
+<ie:webject name="Query-TypeHierarchy" type="MGT">
+    <ie:param name="TYPE"        data="${@FORM[]tipo[]}"/>
+    <ie:param name="DIRECTION"   data="DESCENDANTS"/>
+    <ie:param name="MODE"	   data="FLAT"/>
+    <ie:param name="RESOLVER"	   data="com.ptc.core.adapter.server.impl.WindchillTypeHierarchyGraph"/>
+    <ie:param name="GROUP_OUT"   data="output"/>
+</ie:webject>
+-->
+ 
+<ie:webject name="Query-Type-Tree" type="OBJ" >
+	<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+	<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+	<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+	<ie:param name="ROOT_LEVEL"	data="${@FORM[]tipo[]}"/>
+	<ie:param name="SEARCH_TYPE" data="BOTH"/>
+	<ie:param name="GROUP_OUT" data="tipos"/>
+</ie:webject>
+
+<ie:webject name="Create-Group" type="GRP" >
+	<ie:param name="GROUP_OUT" data="salida"/>
+</ie:webject>
+
+<%
+	Group tipos = getGroup("tipos");
+	Group salida = getGroup("salida");
+	if (tipos.getElementCount() > 1) {
+		int i = 0;
+		for (i = 1; i < tipos.getElementCount(); i++) {
+			salida.addElement(tipos.getElementAt(i));
+		}
+	}
+%>
+
+<ie:webject name="Sort-Group" type="GRP">
+	<ie:param name="GROUP_IN" data="salida"/>
+	<ie:param name="SORTBY" data="type"/>
+	<ie:param name="GROUP_OUT" data="output"/>
+</ie:webject>
+  
+
+

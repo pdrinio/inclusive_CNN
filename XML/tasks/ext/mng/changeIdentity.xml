@@ -1,0 +1,22 @@
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="java.io.File"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string obid                 Id del objeto al que se le quiere cambiar la identidad
+@param string fields               Nuevos campos de identidad
+-->
+
+<ie:webject name="Change-Identity" type="ACT">
+	<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+    <ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+    <ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[0]}"/>
+    <ie:param name="OBJECT_REF" 	data="${@FORM[]obid[0]}"/>    
+    <ie:param name="FIELD" 			data="${@FORM[]fields[0]}" valueSeparator="," delim="," />
+    <ie:param name="GROUP_OUT"    	data="output"/>
+ </ie:webject>

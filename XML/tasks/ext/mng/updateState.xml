@@ -1,0 +1,77 @@
+<?xml version="1.0" standalone="yes"?>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder,wt.lifecycle.*,wt.fc.*,wt.doc.WTDocument,wt.part.WTPart,wt.epm.EPMDocument,wt.services.*"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string ufid 	Los ids de los objetos de los que se quiere modificar el estado (separados por ,)
+@param string state Estados en los que se desean poner los objectos (separeados por ,). si solo se pasa un estado, se pone ese para todos los objetos
+-->
+
+<%
+	try {
+		String desiredStates = (String)getParam("state", "");
+		String[] states = desiredStates.split(",");
+		String desiredState = null;
+		State state = null;
+		int stateIndex = 0;
+		int stateInc = 1;
+		
+		String ids = (String)getParam("ufid","");
+		String[] listIds = ids.split(",");
+		
+		
+		if ((states.length == 1) || (states.length != listIds.length)) {
+			stateInc = 0 ;
+		}
+		
+		for (String obid:listIds) {
+			desiredState = states[stateIndex];
+			state = State.toState(desiredState);
+			stateIndex = stateIndex + stateInc;
+			
+			String[] obidP = obid.replace("%3A",":").split(":");
+			
+			if (obidP.length >= 3) {
+				obid = obidP[0] + ":" + obidP[1] + ":" + obidP[2];
+			}
+			
+			ReferenceFactory rfo = new ReferenceFactory();
+			Persistable po = rfo.getReference(obid).getObject();
+			
+			StandardLifeCycleService service = StandardLifeCycleService.newStandardLifeCycleService();
+			ManagerService manager = ManagerServiceFactory.getDefault();
+			service.setManagerService(manager);
+			service.registerEvents(service.getManagerService());
+			
+			if (obid.toLowerCase().contains("epmdocument")) {
+				EPMDocument epm = (EPMDocument)po;
+				service.setLifeCycleState(epm , state , true);
+			} else if (obid.toLowerCase().contains("wtdocument")) {
+				WTDocument doc = (WTDocument)po;
+				service.setLifeCycleState(doc , state , true);
+			} else if (obid.toLowerCase().contains("wtpart")) {
+				WTPart part = (WTPart)po;
+				service.setLifeCycleState(part , state , true);
+			}
+		}
+	} catch (Exception ex) {
+		System.out.println("--------------------------------");
+		System.out.println("--------------------------------");
+		ex.printStackTrace(System.out);
+		System.out.println("--------------------------------");
+		System.out.println("--------------------------------");
+%>
+		<ie:webject name="Throw-Exception" type="MGT" />
+<%
+	}
+%>
+	<ie:webject name="Create-Group" type="GRP">
+		<ie:param name="GROUP_OUT" 	data="results"/>
+		<ie:param name="ELEMENT"	data="result=TRUE"/>
+		<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+	</ie:webject>

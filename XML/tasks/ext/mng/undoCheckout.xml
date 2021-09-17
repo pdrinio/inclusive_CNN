@@ -1,0 +1,24 @@
+<?xml version="1.0" standalone="yes"?>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+
+<!--com.infoengine.soap.rpc.def
+
+Deshace un checkOut de los objetos cuyos ids se pasan por parámetro
+
+@param string ufid Los ids de los objetos separados por ;
+
+-->
+
+<ie:webject name="Undo-Checkout" type="ACT">
+  <ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+  <ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+  <ie:param name="OBJECT_REF" 		data="${@FORM[]ufid[]}" valueSeparator=";" delim=";"/>
+  <ie:param name="GROUP_OUT" 		data="output"/>
+</ie:webject>

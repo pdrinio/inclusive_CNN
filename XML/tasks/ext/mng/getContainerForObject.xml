@@ -1,0 +1,38 @@
+<%@page language="java" import="com.infoengine.au.NamingService,wt.util.*"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+@param string obid name of container in which folders will be found
+-->
+
+<ie:unit>
+	<ie:webject name="Query-Objects" type="OBJ"> 
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="OBJECT_REF"		 data="${@FORM[]obid[]}"/>
+		<ie:param name="GROUP_OUT"       data="object"/>
+	</ie:webject>
+  
+	<ie:webject name="Expand-References" type="OBJ">
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="REFERENCE" 	 	 data="obid"/>
+		<ie:param name="GROUP_IN" 		 data="object"/>
+		<ie:param name="GROUP_OUT" 		 data="object"/>
+	</ie:webject>
+	
+	<ie:webject name="Query-Objects" type="OBJ"> 
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+		<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+		<ie:param name="OBJECT_REF"		 data="${object[]obid.containerReference[]}"/>
+		<ie:param name="GROUP_OUT"       data="output"/>
+	</ie:webject>
+</ie:unit>

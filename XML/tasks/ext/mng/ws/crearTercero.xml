@@ -1,0 +1,148 @@
+<%@page language="java" import="com.infoengine.au.NamingService"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder,java.util.regex.*,java.util.*,java.util.regex.Pattern,java.lang.*"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.delegate.def
+@comment Servicio Web para la creación de terceros
+@delegateName crearTercero
+-->
+
+<!--com.infoengine.soap.rpc.def
+@param string id 			Id MANGO
+@param string nombre		Nombre del tercero
+@param string descripcion 	Descripción del tercero
+@param string tipo 			Tipo de tercero
+@param string direccion 	Dirección del tercero
+@param string pais 			País del tercero
+@param string ciudad 		Ciudad del tercero
+@param string mail 			Mail del tercero
+@param string telefono 		Teléfono del tercero
+-->
+
+<%	
+	String id = (String) getParam("id", "");
+	String nombre = (String) getParam("nombre", null);
+	String tipo = (String) getParam("tipo", "PROVEEDOR");
+	String result = "result=false";
+	String nameSearch = nombre;
+	Group grp;
+	int endIndex;
+
+	if ((nombre != null) && (nombre.length() >= 0)) {
+		endIndex = Math.min(nombre.length(), 60);
+		nombre = nombre.substring(0, endIndex);
+		nameSearch = nombre.replace("'", "?");
+	}
+%>
+	<ie:unit>
+  		<ie:init>
+			<ie:webject name="Start-Session" type="ACT">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[]}"/>
+				<ie:param name="GROUP_OUT" 		data="session"/>				
+			</ie:webject>
+
+			<ie:webject name="Start-Transaction" type="ACT">
+				<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" 	data="${session[]session_id[0]}"/>
+				<ie:param name="AUTHORIZATION" 	data="${@SERVER[]authorization[]}"/>
+			</ie:webject>
+		</ie:init>
+
+<!-- Comprobamos que no existe un tercero con el mismo nombre o con el id de Mango	-->		
+		<ie:webject name="Search-Objects" type="OBJ"> 
+			<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+			<ie:param name="INSTANCE"       data="<%= wtInstance %>"/>
+			<ie:param name="AUTHORIZATION"  data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+			<ie:param name="TYPE"			data="Tercero"/>
+			<ie:param name="WHERE"			data="(name='<%= nameSearch %>')|(Id='<%= id %>')"/>
+			<ie:param name="ATTRIBUTE"		data="obid"/>
+			<ie:param name="GROUP_OUT"      data="search"/>
+		</ie:webject>
+<%
+		grp = getGroup("search");
+		if (grp.getElementCount() == 0) {
+			if (nombre.length() < 1) {
+				System.out.println("*************************************************************************");
+				System.out.println("*************************************************************************");
+				System.out.println("*************************************************************************");
+				System.out.println("CREAR TERCERO.");
+				System.out.println("ERROR: Atributo 'Nombre' vacio. Id Tercero = " + id);
+				System.out.println("*************************************************************************");
+				System.out.println("*************************************************************************");
+				System.out.println("*************************************************************************");
+			} 
+			else {
+%>		
+				<ie:webject name="Query-Objects" type="OBJ">
+					<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+					<ie:param name="INSTANCE"        data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="AUTHORIZATION"   data="${@SERVER[]AUTHORIZATION[0]}" default=""/>
+					<ie:param name="TYPE"            data="LibTerceros"/>
+					<ie:param name="WHERE"           data="()"/>				
+					<ie:param name="GROUP_OUT"       data="libTerceros"/>
+				</ie:webject>
+		
+				<ie:webject name="Create-Objects" type="ACT">
+					<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+					<ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+					<ie:param name="SESSION_ID" 	data="${session[]session_id[0]}"/>
+					<ie:param name="TYPE" 			data="Tercero"/>
+					<ie:param name="CONTAINER_REF" 	data="${libTerceros[]obid[]}"/>
+					<ie:param name="FIELD" 			data="name=<%= nombre %>"/>
+					<ie:param name="FIELD" 			data="Id=<%= id %>"/>
+					<ie:param name="FIELD" 			data="Descripcion=${@FORM[]descripcion[]}"/>				
+					<ie:param name="FIELD" 			data="Tipo=<%= tipo %>"/>
+					<ie:param name="FIELD" 			data="Direccion=${@FORM[]direccion[]}"/>
+					<ie:param name="FIELD" 			data="Pais=${@FORM[]pais[]}"/>
+					<ie:param name="FIELD" 			data="Ciudad=${@FORM[]ciudad[]}"/>
+					<ie:param name="FIELD" 			data="Email=${@FORM[]mail[]}"/>
+					<ie:param name="FIELD" 			data="Telefono=${@FORM[]telefono[]}"/>
+					<ie:param name="GROUP_OUT" 		data="tercero"/>
+				</ie:webject>
+	<%
+				grp = getGroup("tercero");
+				if (grp.getElementCount() > 0) {
+					//result = grp.getAttributeValue(0, "obid").toString();
+					//result = "idWindchill=" + result.split(":")[2];
+					result = "result=true";
+				}
+			}
+		}
+%>		
+		<ie:webject name="Create-Group" type="GRP">
+			<ie:param name="ELEMENT"	data="<%= result %>"/>
+			<ie:param name="GROUP_OUT"	data="output"/>
+		</ie:webject>
+	
+		<ie:success>
+			<ie:webject name="Commit-Transaction" type="ACT">
+				<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="End-Session" type="ACT">
+				<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+		</ie:success>
+		<ie:failure>
+    		<ie:webject name="Rollback-Transaction" type="ACT">
+				<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="End-Session" type="ACT">
+				<ie:param name="INSTANCE" data="<%= wtInstance %>" default="Windchill"/>
+				<ie:param name="SESSION_ID" data="${session[]session_id[0]}"/>
+			</ie:webject>
+
+			<ie:webject name="Throw-Exception" TYPE="MGT"/>
+		</ie:failure>
+	</ie:unit>

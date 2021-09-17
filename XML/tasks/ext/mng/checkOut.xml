@@ -1,0 +1,27 @@
+<?xml version="1.0" standalone="yes"?>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+
+Checks out one or more objects.  The working copies of the checked-out objects
+are returned.
+
+@param string ufid 		The UFID of the object to be checked out
+@param string comment 	The check-out comment
+
+-->
+
+<ie:webject name="Checkout-Objects" type="ACT">
+  <ie:param name="ACCEPT_LANGUAGE" 	data="es-ES"/>
+  <ie:param name="INSTANCE" 		data="<%= wtInstance %>" default="Windchill"/>
+  <ie:param name="OBJECT_REF" 		data="${@FORM[]ufid[]}" valueSeparator=";" delim=";"/>
+  <ie:param name="COMMENT" 			data="${@FORM[]comment[]}"/>
+  <ie:param name="GROUP_OUT" 		data="output"/>
+</ie:webject>

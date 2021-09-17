@@ -1,0 +1,62 @@
+<?xml version="1.0" standalone="yes"?>
+<%@page language="java" session="false"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+<%@page import= "java.util.*,wt.util.*"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+   
+<!--com.infoengine.soap.rpc.def
+@param string userName Login del usuario del que se quiere obtener información
+-->
+
+<ie:unit>  	
+	<ie:webject name="Create-Group" type="GRP">
+		<ie:param name="GROUP_OUT" 	data="results"/>
+		<ie:param name="CLASS" 		data="wt.fc.WTObject"/>
+	</ie:webject>
+
+	<ie:webject name="Query-Objects" type="OBJ">
+		<ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+		<ie:param name="INSTANCE" 	data="<%= wtInstance %>" default="Windchill"/>        
+		<ie:param name="TYPE"		data="wt.org.WTUser"/>
+		<ie:param name="WHERE"		data="(name='${@FORM[]userName[0]}*')"/>
+		<ie:param name="GROUP_OUT"	data="usuario"/>
+	</ie:webject> 
+	
+	<%
+		Group results = getGroup("results");
+		Group usuario = getGroup("usuario");		
+		String parent = null;
+		
+		Element uinfo = new Element("userInfo");
+		//uinfo.addAtt(new Att("user", usuario.getAttributeValue(0,"authenticationName")));
+		//uinfo.addAtt(new Att("user", user));
+				
+		if (usuario.getElementCount() == 1) {
+			Element tmp = usuario.getElementAt(0);			
+			Enumeration eAtts = ((Att)tmp.getAtt("parent")).getValues();
+			
+			while(eAtts.hasMoreElements()) {
+				parent = (String)eAtts.nextElement();
+				
+				if ((parent != null) && (parent.contains(",")) && (parent.startsWith("cn="))) {
+					String pr_name = parent.split(",")[0];					
+					pr_name = pr_name.split("=")[1];
+					uinfo.addAtt(new Att("group", pr_name));
+				}
+			}
+			results.addElement(uinfo);
+		}
+	%>
+
+	<ie:webject name="Sort-Group" type="GRP">
+		<ie:param name="GROUP_IN"   data="results"/>
+		<ie:param name="SORTBY"	    data="group" delim=","/>
+		<ie:param name="GROUP_OUT"  data="output"/>
+	</ie:webject>
+
+</ie:unit>
+

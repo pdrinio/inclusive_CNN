@@ -1,0 +1,27 @@
+<?xml version="1.0" standalone="yes"?>
+<%@page import="wt.util.*,wt.httpgw.WTURLEncoder"%>
+<%@taglib uri="http://www.ptc.com/infoengine/taglib/core" prefix="ie"%>
+
+<%
+  WTProperties wtprops = WTProperties.getLocalProperties();
+  String wtInstance = wtprops.getProperty("wt.federation.ie.VMName");
+%>
+
+<!--com.infoengine.soap.rpc.def
+
+Checks in one or more objects with state of "in-work".  Normally, these will
+be objects that were previously checked out.  The checked-in objects are
+returned.
+
+@param string ufid The UFID of the object to be checked in
+@param string comment The check-in comment
+
+-->
+
+<ie:webject name="Checkin-Objects" type="ACT">
+  <ie:param name="ACCEPT_LANGUAGE" data="es-ES"/>
+  <ie:param name="instance" data="<%= wtInstance %>" default="Windchill"/>
+  <ie:param name="object_ref" data="${@FORM[]ufid[]}" delim=";" valueSeparator=";"/>
+  <ie:param name="comment" data="${@FORM[]comment[]}"/>
+  <ie:param name="group_out" data="output"/>
+</ie:webject>
