@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<Configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <ServersConfiguration>    
+    <ConfigurationItem>
+      <Servidor>http://pdmmango.loirainter.com/Windchill</Servidor>
+      <Usuario>raul</Usuario>
+      <Contraseña>hjBy3bYG5SLmWIgLaIcKgQ==</Contraseña>
+      <AliasServidor>PDM Mango</AliasServidor>
+      <Activo>true</Activo>
+      <TaskPath>/servlet/IE/tasks/ext/mng/</TaskPath>
+      <IntegratedAuthentication>false</IntegratedAuthentication>
+      <ShowMessagebox>true</ShowMessagebox>
+    </ConfigurationItem>
+    <ConfigurationItem>
+      <Servidor>http://pdmmango.loirainter.com/Windchill</Servidor>
+      <Usuario>obras</Usuario>
+      <Contraseña>1P55agTX5rt+IEywAMbRww==</Contraseña>
+      <AliasServidor>PDM Mango obras</AliasServidor>
+      <Activo>false</Activo>
+      <TaskPath>/servlet/IE/tasks/ext/mng/</TaskPath>
+      <IntegratedAuthentication>false</IntegratedAuthentication>
+      <ShowMessagebox>true</ShowMessagebox>
+    </ConfigurationItem>
+    <ConfigurationItem>
+      <Servidor>http://pdmmango.loirainter.com/Windchill</Servidor>
+      <Usuario>expansion</Usuario>
+      <Contraseña>e45IuxFCr4oaanCZfiqCcj2I9EPitM5J</Contraseña>
+      <AliasServidor>PDM Mango expansion</AliasServidor>
+      <Activo>false</Activo>
+      <TaskPath>/servlet/IE/tasks/ext/mng/</TaskPath>
+      <IntegratedAuthentication>false</IntegratedAuthentication>
+      <ShowMessagebox>true</ShowMessagebox>
+    </ConfigurationItem>
+    <ConfigurationItem>
+      <Servidor>http://pdmmango.loirainter.com/Windchill</Servidor>
+      <Usuario>interiorismo</Usuario>
+      <Contraseña>B2Mvb7FFSYE58uG3wfdgS51iKYCBO8AyDc6UU3ROYGY=</Contraseña>
+      <AliasServidor>PDM Mango interiorismo</AliasServidor>
+      <Activo>false</Activo>
+      <TaskPath>/servlet/IE/tasks/ext/mng/</TaskPath>
+      <IntegratedAuthentication>false</IntegratedAuthentication>
+      <ShowMessagebox>true</ShowMessagebox>
+    </ConfigurationItem>
+    <ConfigurationItem>
+      <Servidor>http://pdmmango.loirainter.com/Windchill</Servidor>
+      <Usuario>controlinteriorismo</Usuario>
+      <Contraseña>b/rrSOdabME91c0htwgjBq8RfkKiCBzIRAZEy5+NKMAuPFwYnT3F7g==</Contraseña>
+      <AliasServidor>PDM Mango Control Interirorismo</AliasServidor>
+      <Activo>false</Activo>
+      <TaskPath>/servlet/IE/tasks/ext/mng/</TaskPath>
+      <IntegratedAuthentication>false</IntegratedAuthentication>
+      <ShowMessagebox>true</ShowMessagebox>
+    </ConfigurationItem>
+  </ServersConfiguration>
+  <Locale>es-ES</Locale>
+  <LocalePath>.\Locales</LocalePath>
+  <PreloadCADViewer>false</PreloadCADViewer>
+  <UrlUniverse>http://lcvstfs01/UniVerseServices/universeservices.asmx</UrlUniverse>
+</Configuration>
