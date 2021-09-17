@@ -1,0 +1,64 @@
+﻿/* *****************************************************************************
+// Localizable resource description for the DG Test Add-On
+// API Development Kit 14; Mac/Win
+//
+// Namespaces:			Contact person:
+//		-None-
+//
+// [SG compatible] - Yes
+// ****************************************************************************/
+
+/* Add-On Information */
+
+'STR#' 32000 "Add-on Name and Description" {
+/* [  1] */		"Libcat"
+/* [  2] */		"Libcat"
+}
+
+
+/* Text appearing in the menu */
+
+'STR#' 32500 "Menu strings" {
+/* [   ] */		"Libcat"
+/* [   ] */		"Paleta"
+/* [  1] */			"Ver Paleta^ES^EE^EI^ED^EW^EL"
+/* [  2] */			"Insertar elementos Biblioteca^EL"
+/* [  3] */			"Listar elementos Biblioteca en plano^EL"
+/* [  4] */			"Listar elementos Biblioteca en plano agrupar por elemento^EL"
+/* [  5] */			"Listar elementos Biblioteca en plano agrupar por elemento y capa^EL"
+}
+
+'STR#' 32510 "Prompt strings" {
+/* [   ] */		"Libcat"
+/* [   ] */		"Paleta"
+/* [  1] */			"Ver Paleta"
+/* [  2] */			"Insertar elementos Biblioteca"
+/* [  3] */			"Listar elementos de Biblioteca en plano"
+/* [  4] */			"Listar elementos Biblioteca en plano agrupar por elemento"
+/* [  5] */			"Listar elementos Biblioteca en plano agrupar por elemento y capa"
+}
+
+
+
+/* ---------------------------------------------------------- Library Browser */
+'GDLG' 32400  Palette | topCaption | close    0    0 516  186  "Libcat" {
+/* [  1] */ UserControl			 12    8   66   22	259			1	3	0	0	32521
+/* [  2] */ SingleSelListView	  8   36  500  140	SmallPlain  64  64  96  96  bottomText
+}
+
+'DLGH'  32400  DLG_32400_Library_Browser {
+1	""							UC259_0
+2	""							SingleSelListView_0
+}
+
+
+
+/* ---------------------------------------------------------- Progress window */
+'GDLG'  32550  Modal    0    0  220  60  "Progreso" {
+/* [  1] */ Button            140   20   70   20  LargePlain  "Cancelar"
+/* [  2] */ LeftText           10   25  120   16  LargeBold	  ""
+}
+'DLGH'  32550  DLG_32550_Progress {
+1	""							Button_0
+2	""							LeftText_0
+}

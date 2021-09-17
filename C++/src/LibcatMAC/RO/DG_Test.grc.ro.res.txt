@@ -1,0 +1,6 @@
+﻿DLG_32400_Library_Browser	32400	0	"Libcat"	""
+DLG_32400_Library_Browser-UC259_0	32400	1	"Libcat"	""
+DLG_32400_Library_Browser-SingleSelListView_0	32400	2	"Libcat"	""
+DLG_32550_Progress	32550	0	"Progreso"	""
+DLG_32550_Progress-Button_0	32550	1	"Progreso"	""
+DLG_32550_Progress-LeftText_0	32550	2	"Progreso"	""

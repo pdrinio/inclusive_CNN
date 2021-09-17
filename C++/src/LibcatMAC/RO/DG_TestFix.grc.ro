@@ -1,0 +1,1 @@
+ #include "MDIDs_APICD.h"resource 'MDID' (32500, "Add-On Identifier", purgeable) {	MDID_APICD,	MDID_APICD_DGTest};
